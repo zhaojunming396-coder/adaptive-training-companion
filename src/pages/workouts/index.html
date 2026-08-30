@@ -303,6 +303,112 @@
         background: rgba(255, 176, 32, 0.1);
       }
 
+      .feedback-card {
+        border: 1px solid rgba(52, 199, 89, 0.36);
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 14px;
+        background: linear-gradient(180deg, rgba(52, 199, 89, 0.14) 0%, var(--surface) 100%);
+      }
+
+      .feedback-card h2 {
+        margin-bottom: 8px;
+      }
+
+      .feedback-card p {
+        margin-bottom: 8px;
+      }
+
+      .feedback-baseline {
+        border-color: rgba(255, 176, 32, 0.42);
+        background: linear-gradient(180deg, rgba(255, 176, 32, 0.14) 0%, var(--surface) 100%);
+      }
+
+      .feedback-reduce {
+        border-color: rgba(255, 107, 107, 0.42);
+        background: linear-gradient(180deg, rgba(255, 107, 107, 0.14) 0%, var(--surface) 100%);
+      }
+
+      .feedback-maintain,
+      .feedback-recovery,
+      .feedback-catch_up {
+        border-color: rgba(86, 154, 255, 0.34);
+        background: linear-gradient(180deg, rgba(86, 154, 255, 0.12) 0%, var(--surface) 100%);
+      }
+
+      .feedback-label {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        margin-bottom: 10px;
+        color: #06120a;
+        background: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .feedback-baseline .feedback-label {
+        background: var(--warning);
+        color: #1a1000;
+      }
+
+      .feedback-reduce .feedback-label {
+        background: var(--danger);
+        color: #1f0707;
+      }
+
+      .feedback-maintain .feedback-label,
+      .feedback-recovery .feedback-label,
+      .feedback-catch_up .feedback-label {
+        color: var(--text);
+        background: #2b5f9e;
+      }
+
+      .feedback-evidence {
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .feedback-progress {
+        width: 100%;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .feedback-progress span {
+        display: block;
+        min-width: 8px;
+        max-width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .compact-card {
+        padding-bottom: 14px;
+      }
+
+      .feedback-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .feedback-row {
+        display: grid;
+        gap: 4px;
+        border-radius: 14px;
+        padding: 12px;
+        background: var(--surface-2);
+      }
+
+      .feedback-row span {
+        font-size: 13px;
+      }
+
       .last-record p,
       .last-record ul,
       .recommendation-card p {

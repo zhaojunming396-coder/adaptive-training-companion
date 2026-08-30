@@ -1,4 +1,18 @@
-import { getTodayTrainingSelection, buildTrainingDayDetail } from '../../data/workouts/workoutSession.js';
+import {
+  getLastExercisePerformance,
+  getTodayTrainingSelection,
+  buildTrainingDayDetail,
+  readWorkoutHistory
+} from '../../data/workouts/workoutSession.js';
+import {
+  buildTrainingOverview,
+  getRecentSessionVolumeTrend
+} from '../../data/workouts/workoutAnalytics.js';
+import {
+  getLastCompletedExerciseLog,
+  recommendWeightForTarget,
+  readUserTrainingProfile
+} from '../../data/workouts/weightRecommendation.js';
 import {
   appState,
   getSelectionSourceText,
@@ -21,6 +35,288 @@ const focusText = {
   lower_body_posterior_chain: '臀腿后侧',
   cardio_core: '有氧与核心'
 };
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getSessionTime(session) {
+  return new Date(session.endedAt || session.startedAt || session.date || 0).getTime();
+}
+
+function getCompletedSets(log) {
+  return Array.isArray(log && log.sets) ? log.sets.filter((set) => set.completed === true) : [];
+}
+
+function getSetVolume(set) {
+  const weight = toNumber(set && set.weight);
+  const reps = toNumber(set && set.reps);
+  return weight === null || reps === null ? 0 : weight * reps;
+}
+
+function getSessionVolume(session) {
+  return (Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [])
+    .reduce((sum, log) => sum + getCompletedSets(log).reduce((setSum, set) => setSum + getSetVolume(set), 0), 0);
+}
+
+function getCompletedSetCount(session) {
+  return (Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [])
+    .reduce((sum, log) => sum + getCompletedSets(log).length, 0);
+}
+
+function getPlannedTrainingCount() {
+  const weeklyFrequency = Number(bodyRecomposition4DayPlan.weeklyFrequency);
+  return Number.isFinite(weeklyFrequency) && weeklyFrequency > 0 ? weeklyFrequency : bodyRecomposition4DayPlan.weeklySchedule
+    .filter((item) => item.planDayId)
+    .length;
+}
+
+function getPreviousSamePlanDay(history, planDayId) {
+  return (Array.isArray(history) ? history : [])
+    .filter((session) => session.planDayId === planDayId && session.completed !== false)
+    .slice()
+    .sort((a, b) => getSessionTime(b) - getSessionTime(a))[0] || null;
+}
+
+function getSamePlanDayHistory(history, planDayId) {
+  return (Array.isArray(history) ? history : [])
+    .filter((session) => session.planDayId === planDayId && session.completed !== false)
+    .slice()
+    .sort((a, b) => getSessionTime(b) - getSessionTime(a));
+}
+
+function getLastSession(history) {
+  return (Array.isArray(history) ? history : [])
+    .filter((session) => session.completed !== false)
+    .slice()
+    .sort((a, b) => getSessionTime(b) - getSessionTime(a))[0] || null;
+}
+
+function formatVolume(value) {
+  return `${Math.round(value || 0)} kg·次`;
+}
+
+function buildTrainingFeedback({ history, selection, detail }) {
+  const plannedCount = getPlannedTrainingCount();
+  const overview = buildTrainingOverview(history);
+  const volumeTrend = getRecentSessionVolumeTrend(history, 4);
+  const lastSession = getLastSession(history);
+  const previousSameDay = detail && detail.planDayId
+    ? getPreviousSamePlanDay(history, detail.planDayId)
+    : null;
+  const previousVolume = previousSameDay ? getSessionVolume(previousSameDay) : 0;
+  const recentVolume = volumeTrend.length > 0 ? volumeTrend[volumeTrend.length - 1].volume : 0;
+  const weekPercent = plannedCount > 0
+    ? Math.min(100, Math.round((overview.weeklyTrainingCount / plannedCount) * 100))
+    : 0;
+
+  if (selection.isRestDay) {
+    return {
+      status: overview.weeklyTrainingCount >= plannedCount ? 'recovery' : 'catch_up',
+      label: overview.weeklyTrainingCount >= plannedCount ? '恢复日' : '本周缺口',
+      headline: overview.weeklyTrainingCount >= plannedCount
+        ? '本周训练量已经够，今天优先恢复。'
+        : '今天是休息日，但本周训练次数还没打满。',
+      advice: overview.weeklyTrainingCount >= plannedCount
+        ? '建议做 20-30 分钟低强度活动度或散步，保留下一次主训练表现。'
+        : '如果状态很好，可以手动切换到漏掉的训练日；如果疲劳明显，就保持休息。',
+      evidence: lastSession
+        ? `最近一次训练：${lastSession.date}，完成 ${getCompletedSetCount(lastSession)} 组，容量 ${formatVolume(getSessionVolume(lastSession))}。`
+        : '暂无历史训练记录，先用 1-2 周建立个人基准。',
+      weekPercent,
+      overview,
+      previousSameDay,
+      recentVolume
+    };
+  }
+
+  if (!previousSameDay) {
+    return {
+      status: 'baseline',
+      label: '建立基准',
+      headline: '今天先建立这个训练日的第一组数据。',
+      advice: '先按建议重量保守完成目标次数，记录重量、次数和 RIR。下次系统才能判断该加重量、加次数还是保持。',
+      evidence: lastSession
+        ? `最近一次训练：${lastSession.date}，容量 ${formatVolume(getSessionVolume(lastSession))}。`
+        : '暂无历史训练记录，今天的数据会成为后续反馈的起点。',
+      weekPercent,
+      overview,
+      previousSameDay,
+      recentVolume
+    };
+  }
+
+  const samePlanDayHistory = getSamePlanDayHistory(history, detail.planDayId);
+  const latestSameDay = samePlanDayHistory[0] || null;
+  const earlierSameDay = samePlanDayHistory[1] || null;
+  const latestSameDayVolume = latestSameDay ? getSessionVolume(latestSameDay) : 0;
+  const earlierSameDayVolume = earlierSameDay ? getSessionVolume(earlierSameDay) : 0;
+
+  if (!earlierSameDay) {
+    return {
+      status: 'maintain',
+      label: '稳定复现',
+      headline: '已经有一次同类训练记录，今天先复现并微调。',
+      advice: '保持上次主要重量，目标是多完成 1-2 次或让 RIR 更接近计划值。完成后系统会开始判断趋势。',
+      evidence: `上次同类训练：${latestSameDay.date}，完成 ${getCompletedSetCount(latestSameDay)} 组，容量 ${formatVolume(latestSameDayVolume)}。`,
+      weekPercent,
+      overview,
+      previousSameDay,
+      recentVolume
+    };
+  }
+
+  const diff = latestSameDayVolume - earlierSameDayVolume;
+  const diffPercent = earlierSameDayVolume > 0 ? Math.round((diff / earlierSameDayVolume) * 100) : 0;
+
+  if (diffPercent >= 8) {
+    return {
+      status: 'progress',
+      label: '可推进',
+      headline: '最近表现高于上次同类训练，今天可以小幅推进。',
+      advice: '优先把目标次数做满；如果主项动作稳定且 RIR 仍有余量，再尝试增加一个最小重量档位。',
+      evidence: `最近两次同类训练：${earlierSameDay.date} → ${latestSameDay.date}，容量变化约 ${diffPercent}%。`,
+      weekPercent,
+      overview,
+      previousSameDay,
+      recentVolume
+    };
+  }
+
+  if (diffPercent <= -12) {
+    return {
+      status: 'reduce',
+      label: '保守调整',
+      headline: '最近训练容量下降，今天先保护动作质量。',
+      advice: '主项重量降低 5-10% 或少做 1 组，重点记录 RIR 和疲劳原因，避免把下降误判成失败。',
+      evidence: `最近两次同类训练：${earlierSameDay.date} → ${latestSameDay.date}，容量变化约 ${diffPercent}%。`,
+      weekPercent,
+      overview,
+      previousSameDay,
+      recentVolume
+    };
+  }
+
+  return {
+    status: 'maintain',
+    label: '稳定推进',
+    headline: '最近表现接近上次，今天目标是把质量做稳。',
+    advice: '保持上次重量，争取每组多 1 次或让 RIR 更接近目标。达标后下一次再加重量。',
+    evidence: `最近两次同类训练：${earlierSameDay.date} → ${latestSameDay.date}，容量变化约 ${diffPercent}%。`,
+    weekPercent,
+    overview,
+    previousSameDay,
+    recentVolume
+  };
+}
+
+function renderStatGrid(items) {
+  const grid = document.createElement('div');
+  grid.className = 'stat-grid';
+  items.forEach(([label, value]) => {
+    const item = document.createElement('div');
+    item.className = 'stat-item';
+    item.innerHTML = `<span class="stat-label">${label}</span><span class="stat-value">${value}</span>`;
+    grid.appendChild(item);
+  });
+  return grid;
+}
+
+function renderFeedbackPanel(page, feedback) {
+  const card = document.createElement('section');
+  card.className = `feedback-card feedback-${feedback.status}`;
+  card.innerHTML = [
+    `<div class="feedback-label">${feedback.label}</div>`,
+    `<h2>${feedback.headline}</h2>`,
+    `<p>${feedback.advice}</p>`,
+    `<p class="feedback-evidence">${feedback.evidence}</p>`
+  ].join('');
+  page.appendChild(card);
+
+  const progressCard = document.createElement('section');
+  progressCard.className = 'exercise compact-card';
+  const title = document.createElement('h2');
+  title.textContent = '本周训练反馈';
+  progressCard.appendChild(title);
+  progressCard.appendChild(renderStatGrid([
+    ['本周完成', `${feedback.overview.weeklyTrainingCount}/${getPlannedTrainingCount()} 次`],
+    ['完成度', `${feedback.weekPercent}%`],
+    ['累计组数', `${feedback.overview.totalCompletedSets} 组`],
+    ['累计容量', formatVolume(feedback.overview.totalVolume)]
+  ]));
+
+  const bar = document.createElement('div');
+  bar.className = 'feedback-progress';
+  bar.innerHTML = `<span style="width: ${feedback.weekPercent}%"></span>`;
+  progressCard.appendChild(bar);
+  page.appendChild(progressCard);
+}
+
+function formatLastPerformance(performance) {
+  if (!performance || !Array.isArray(performance.sets) || performance.sets.length === 0) {
+    return '暂无上次记录';
+  }
+
+  return performance.sets.slice(0, 3).map((set) => {
+    if (set.durationSeconds) {
+      return `${set.durationSeconds}s`;
+    }
+
+    if (set.weight !== null && set.weight !== undefined && set.reps !== null && set.reps !== undefined) {
+      return `${set.weight}kg × ${set.reps}`;
+    }
+
+    return set.reps ? `${set.reps} 次` : '已完成';
+  }).join(' / ');
+}
+
+function renderKeyExerciseFeedback(page, detail) {
+  const card = document.createElement('section');
+  card.className = 'exercise';
+
+  const title = document.createElement('h2');
+  title.textContent = '关键动作建议';
+  card.appendChild(title);
+
+  const profile = readUserTrainingProfile();
+  const list = document.createElement('div');
+  list.className = 'feedback-list';
+
+  detail.exercises.slice(0, 3).forEach((exercise) => {
+    const lastExerciseLog = getLastCompletedExerciseLog(exercise.exerciseId, readWorkoutHistory());
+    const recommendation = recommendWeightForTarget({
+      planExercise: {
+        exerciseId: exercise.exerciseId,
+        target: exercise.target
+      },
+      lastExerciseLog,
+      userProfile: profile
+    });
+    const lastPerformance = getLastExercisePerformance(exercise.exerciseId);
+    const rawRecommendationText = recommendation.type === 'time'
+      ? recommendation.suggestedDurationText
+      : recommendation.suggestedWeightText;
+    const recommendationText = rawRecommendationText === '暂无建议' ? '' : rawRecommendationText;
+    const targetText = exercise.target && exercise.target.reps
+      ? `目标 ${exercise.target.reps} 次，先记录基准表现`
+      : '先记录基准表现';
+    const strategyText = recommendation.strategy === '暂无建议'
+      ? '建立基准'
+      : recommendation.strategy;
+    const row = document.createElement('div');
+    row.className = 'feedback-row';
+    row.innerHTML = [
+      `<strong>${exercise.detail ? exercise.detail.nameZh : exercise.exerciseId}</strong>`,
+      `<span>上次：${formatLastPerformance(lastPerformance)}</span>`,
+      `<span>本次：${recommendationText || targetText} · ${strategyText}</span>`
+    ].join('');
+    list.appendChild(row);
+  });
+
+  card.appendChild(list);
+  page.appendChild(card);
+}
 
 function getManualPlanDay(planDayId) {
   return bodyRecomposition4DayPlan.planDays.find((day) => day.planDayId === planDayId) || null;
@@ -86,20 +382,12 @@ function renderNutritionSummaryCard(page) {
   title.textContent = '今日蛋白质 / 补剂';
   card.appendChild(title);
 
-  const grid = document.createElement('div');
-  grid.className = 'stat-grid';
-  [
+  card.appendChild(renderStatGrid([
     ['今日蛋白质', `${progress.proteinIntakeGram}g / ${progress.proteinTargetGram}g`],
     ['还差', `${progress.remainingGram}g`],
     ['今日肌酸', supplementStatus.creatineTaken ? '已记录' : '未记录'],
     ['蛋白粉', supplementStatus.proteinPowderTaken ? '已记录' : '未记录']
-  ].forEach(([label, value]) => {
-    const item = document.createElement('div');
-    item.className = 'stat-item';
-    item.innerHTML = `<span class="stat-label">${label}</span><span class="stat-value">${value}</span>`;
-    grid.appendChild(item);
-  });
-  card.appendChild(grid);
+  ]));
 
   const button = document.createElement('button');
   button.className = 'secondary-button';
@@ -132,8 +420,11 @@ export function renderTodayPage(root) {
 
   const page = document.createElement('section');
   page.className = 'page';
+  const history = readWorkoutHistory();
 
   if (selection.isRestDay) {
+    const feedback = buildTrainingFeedback({ history, selection, detail: null });
+
     const hero = document.createElement('section');
     hero.className = 'hero-card';
 
@@ -156,8 +447,10 @@ export function renderTodayPage(root) {
     hero.appendChild(tip);
 
     page.appendChild(hero);
+    renderFeedbackPanel(page, feedback);
   } else {
     const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
+    const feedback = buildTrainingFeedback({ history, selection, detail });
 
     const hero = document.createElement('section');
     hero.className = 'hero-card';
@@ -171,18 +464,12 @@ export function renderTodayPage(root) {
     name.textContent = detail.nameZh;
     hero.appendChild(name);
 
-    const stats = document.createElement('div');
-    stats.className = 'stat-grid';
-    [
+    hero.appendChild(renderStatGrid([
       ['预计时长', `${detail.estimatedDurationMinutes} 分钟`],
-      ['训练重点', focusText[selection.planDay.focus] || detail.notes || '-']
-    ].forEach(([label, value]) => {
-      const item = document.createElement('div');
-      item.className = 'stat-item';
-      item.innerHTML = `<span class="stat-label">${label}</span><span class="stat-value">${value}</span>`;
-      stats.appendChild(item);
-    });
-    hero.appendChild(stats);
+      ['训练重点', focusText[selection.planDay.focus] || detail.notes || '-'],
+      ['今日反馈', feedback.label],
+      ['本周完成', `${feedback.overview.weeklyTrainingCount}/${getPlannedTrainingCount()} 次`]
+    ]));
 
     const warmup = document.createElement('div');
     warmup.className = 'meta-card';
@@ -195,6 +482,8 @@ export function renderTodayPage(root) {
     hero.appendChild(startButton);
 
     page.appendChild(hero);
+    renderFeedbackPanel(page, feedback);
+    renderKeyExerciseFeedback(page, detail);
 
     const actions = document.createElement('div');
     actions.className = 'actions';

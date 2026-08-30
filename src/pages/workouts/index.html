@@ -399,14 +399,69 @@
 
       .feedback-row {
         display: grid;
-        gap: 4px;
+        gap: 7px;
+        border: 1px solid transparent;
         border-radius: 14px;
         padding: 12px;
         background: var(--surface-2);
       }
 
+      .feedback-row-progress {
+        border-color: rgba(52, 199, 89, 0.38);
+        background: rgba(52, 199, 89, 0.1);
+      }
+
+      .feedback-row-maintain {
+        border-color: rgba(86, 154, 255, 0.34);
+        background: rgba(86, 154, 255, 0.09);
+      }
+
+      .feedback-row-baseline {
+        border-color: rgba(255, 176, 32, 0.38);
+        background: rgba(255, 176, 32, 0.1);
+      }
+
+      .feedback-row-reduce {
+        border-color: rgba(255, 107, 107, 0.42);
+        background: rgba(255, 107, 107, 0.1);
+      }
+
+      .feedback-row-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .feedback-row-head span {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--text);
+        background: rgba(244, 247, 242, 0.1);
+        font-size: 12px;
+        font-weight: 750;
+      }
+
       .feedback-row span {
         font-size: 13px;
+      }
+
+      .feedback-row p,
+      .feedback-row small {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .feedback-row p {
+        color: var(--text);
+      }
+
+      .feedback-row small {
+        display: block;
+        border-top: 1px solid rgba(244, 247, 242, 0.1);
+        padding-top: 7px;
       }
 
       .last-record p,

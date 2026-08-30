@@ -97,6 +97,36 @@ function formatVolume(value) {
   return `${Math.round(value || 0)} kg·次`;
 }
 
+function formatTargetText(target) {
+  if (!target) {
+    return '按计划完成';
+  }
+
+  const parts = [];
+
+  if (target.sets) {
+    parts.push(`${target.sets} 组`);
+  }
+
+  if (target.reps) {
+    parts.push(`${target.reps} 次`);
+  }
+
+  if (target.durationSeconds) {
+    parts.push(`${target.durationSeconds} 秒`);
+  }
+
+  if (target.durationMinutes) {
+    parts.push(`${target.durationMinutes} 分钟`);
+  }
+
+  if (target.rir !== null && target.rir !== undefined) {
+    parts.push(`RIR ${target.rir}`);
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : '按计划完成';
+}
+
 function buildTrainingFeedback({ history, selection, detail }) {
   const plannedCount = getPlannedTrainingCount();
   const overview = buildTrainingOverview(history);
@@ -271,6 +301,58 @@ function formatLastPerformance(performance) {
   }).join(' / ');
 }
 
+function getRecommendationTone(strategy) {
+  if (strategy === '建议加重量' || strategy === '建议增加时长') {
+    return 'progress';
+  }
+
+  if (strategy === '建议降低重量') {
+    return 'reduce';
+  }
+
+  if (strategy === '参考基准力量' || strategy === '暂无建议') {
+    return 'baseline';
+  }
+
+  return 'maintain';
+}
+
+function getNextUpdateText(recommendation, exercise) {
+  const exerciseName = exercise && exercise.detail && exercise.detail.nameZh
+    ? exercise.detail.nameZh
+    : '这个动作';
+
+  if (recommendation.strategy === '建议加重量') {
+    return `${exerciseName} 如果这次仍能完成目标次数并保留余力，下次继续小幅加重量；如果动作变形，下次退回当前重量。`;
+  }
+
+  if (recommendation.strategy === '建议降低重量') {
+    return `${exerciseName} 这次先把动作质量和目标次数做稳；下次只有在大多数完成组达标时再恢复重量。`;
+  }
+
+  if (recommendation.strategy === '建议增加时长') {
+    return `${exerciseName} 这次优先稳定呼吸和节奏；如果完成轻松，下次再增加一小段时长。`;
+  }
+
+  if (recommendation.strategy === '参考基准力量' || recommendation.strategy === '暂无建议') {
+    return `${exerciseName} 今天的数据会成为基准。请记录重量、次数和 RIR，下次系统会开始给出更准确的更新建议。`;
+  }
+
+  return `${exerciseName} 本次先保持强度，争取多做 1-2 次或让 RIR 更接近目标；达标后下次再推进。`;
+}
+
+function getRecommendationValueText(recommendation, exercise) {
+  if (recommendation.type === 'time') {
+    return recommendation.suggestedDurationText && recommendation.suggestedDurationText !== '暂无建议'
+      ? `建议时长：${recommendation.suggestedDurationText}`
+      : `目标：${formatTargetText(exercise.target)}`;
+  }
+
+  return recommendation.suggestedWeightText && recommendation.suggestedWeightText !== '暂无建议'
+    ? `建议重量：${recommendation.suggestedWeightText}`
+    : `先按计划目标建立基准：${formatTargetText(exercise.target)}`;
+}
+
 function renderKeyExerciseFeedback(page, detail) {
   const card = document.createElement('section');
   card.className = 'exercise';
@@ -294,22 +376,21 @@ function renderKeyExerciseFeedback(page, detail) {
       userProfile: profile
     });
     const lastPerformance = getLastExercisePerformance(exercise.exerciseId);
-    const rawRecommendationText = recommendation.type === 'time'
-      ? recommendation.suggestedDurationText
-      : recommendation.suggestedWeightText;
-    const recommendationText = rawRecommendationText === '暂无建议' ? '' : rawRecommendationText;
-    const targetText = exercise.target && exercise.target.reps
-      ? `目标 ${exercise.target.reps} 次，先记录基准表现`
-      : '先记录基准表现';
     const strategyText = recommendation.strategy === '暂无建议'
       ? '建立基准'
       : recommendation.strategy;
     const row = document.createElement('div');
-    row.className = 'feedback-row';
+    row.className = `feedback-row feedback-row-${getRecommendationTone(recommendation.strategy)}`;
     row.innerHTML = [
+      `<div class="feedback-row-head">`,
       `<strong>${exercise.detail ? exercise.detail.nameZh : exercise.exerciseId}</strong>`,
-      `<span>上次：${formatLastPerformance(lastPerformance)}</span>`,
-      `<span>本次：${recommendationText || targetText} · ${strategyText}</span>`
+      `<span>${strategyText}</span>`,
+      `</div>`,
+      `<span>计划目标：${formatTargetText(exercise.target)}</span>`,
+      `<span>上次表现：${formatLastPerformance(lastPerformance)}</span>`,
+      `<span>本次建议：${getRecommendationValueText(recommendation, exercise)}</span>`,
+      `<p>原因：${recommendation.reason}</p>`,
+      `<small>下次更新：${getNextUpdateText(recommendation, exercise)}</small>`
     ].join('');
     list.appendChild(row);
   });

@@ -1,8 +1,12 @@
 .DS_Store
 *.log
 node_modules/
+.npm-cache/
 dist/
 build/
+.next/
+.open-next/
+.wrangler/
 .env
 .env.*
 coverage/

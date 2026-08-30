@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>训练记录</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        color-scheme: dark;
+        --bg: #0f1411;
+        --surface: #171f1a;
+        --surface-2: #202a24;
+        --text: #f4f7f2;
+        --muted: #a8b3aa;
+        --line: #2f3c34;
+        --accent: #34c759;
+        --accent-strong: #21a447;
+        --warning: #ffb020;
+        --danger: #ff6b6b;
+      }
+
+      html,
+      body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        line-height: 1.5;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto 16px;
+        padding: 10px 16px;
+        background: rgba(15, 20, 17, 0.96);
+        border-bottom: 1px solid var(--line);
+      }
+
+      nav a {
+        min-width: 0;
+        color: var(--muted);
+        text-align: center;
+        text-decoration: none;
+        font-size: 12px;
+        padding: 9px 4px;
+        border-radius: 10px;
+        background: var(--surface);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        font-size: 26px;
+        line-height: 1.18;
+        margin-bottom: 10px;
+      }
+
+      h2 {
+        font-size: 22px;
+        line-height: 1.25;
+        margin-bottom: 8px;
+      }
+
+      h3 {
+        font-size: 17px;
+        margin-bottom: 8px;
+      }
+
+      p,
+      li,
+      summary,
+      label,
+      span {
+        color: var(--muted);
+      }
+
+      strong {
+        color: var(--text);
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      button {
+        min-height: 46px;
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 14px;
+        color: #06120a;
+        background: var(--accent);
+        font-weight: 700;
+        font-size: 16px;
+        touch-action: manipulation;
+      }
+
+      .secondary-button {
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        color: var(--text);
+        background: var(--surface-2);
+      }
+
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 86px;
+        margin-top: 8px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        color: var(--text);
+        background: var(--surface-2);
+      }
+
+      .page,
+      .exercise,
+      .history-item,
+      .hero-card,
+      .meta-card,
+      .stat-grid,
+      .stat-item,
+      .target-grid,
+      .target-pill,
+      .last-record,
+      .bar-list,
+      .bar-row,
+      .bar-track,
+      .actions,
+      .set-row,
+      .sticky-actions {
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .exercise,
+      .history-item {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 14px;
+        background: var(--surface);
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+      }
+
+      .page {
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+        border: 0;
+        padding: 0 16px 20px;
+        overflow-x: hidden;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .meta-card {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+        background: var(--surface-2);
+        margin-bottom: 12px;
+      }
+
+      .hero-card {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 18px;
+        margin-bottom: 14px;
+        background: linear-gradient(180deg, #1d2921 0%, var(--surface) 100%);
+      }
+
+      .eyebrow {
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .big-value {
+        color: var(--text);
+        font-size: 30px;
+        line-height: 1.15;
+        font-weight: 800;
+        margin-bottom: 8px;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 12px 0;
+      }
+
+      .stat-item {
+        min-width: 0;
+        border-radius: 14px;
+        padding: 12px;
+        background: var(--surface-2);
+      }
+
+      .stat-label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stat-value {
+        display: block;
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 750;
+        word-break: break-word;
+      }
+
+      .exercise-title {
+        color: var(--text);
+        margin-bottom: 2px;
+      }
+
+      .exercise-subtitle {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+
+      .target-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 10px 0;
+      }
+
+      .target-pill {
+        border-radius: 12px;
+        padding: 9px 10px;
+        background: var(--surface-2);
+      }
+
+      .last-record {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        margin: 10px 0 12px;
+        background: rgba(52, 199, 89, 0.08);
+      }
+
+      .recommendation-card {
+        max-width: 100%;
+        min-width: 0;
+        border: 1px solid rgba(255, 176, 32, 0.38);
+        border-radius: 14px;
+        padding: 12px;
+        margin: 10px 0 12px;
+        background: rgba(255, 176, 32, 0.1);
+      }
+
+      .last-record p,
+      .last-record ul,
+      .recommendation-card p {
+        margin-bottom: 0;
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1.4fr) minmax(70px, 0.8fr);
+        align-items: center;
+        gap: 8px;
+      }
+
+      .bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: var(--surface-2);
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .history-item {
+        cursor: pointer;
+      }
+
+      .warmup-list,
+      ol,
+      ul {
+        padding-left: 20px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .actions button {
+        flex: 1 1 130px;
+      }
+
+      .source-line {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .restore-auto-button {
+        width: 100%;
+        margin-top: 12px;
+        color: #06120a;
+        background: var(--warning);
+      }
+
+      .set-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 12px 0;
+        padding: 12px;
+        border-radius: 14px;
+        background: var(--surface-2);
+      }
+
+      .set-row-error {
+        border: 1px solid rgba(255, 107, 107, 0.72);
+        background: rgba(255, 107, 107, 0.08);
+      }
+
+      .set-title,
+      .set-completed,
+      .set-error-text {
+        grid-column: 1 / -1;
+      }
+
+      .set-title {
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 750;
+      }
+
+      .field-label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .set-completed {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+      }
+
+      .set-completed input {
+        width: 22px;
+        min-height: 22px;
+      }
+
+      .set-error-text {
+        margin: -2px 0 0;
+        color: var(--danger);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .notice {
+        color: var(--danger);
+        background: rgba(255, 107, 107, 0.12);
+        border: 1px solid rgba(255, 107, 107, 0.28);
+        border-radius: 12px;
+        padding: 10px;
+      }
+
+      .success-notice {
+        color: var(--accent);
+        background: rgba(52, 199, 89, 0.12);
+        border-color: rgba(52, 199, 89, 0.3);
+        margin-bottom: 12px;
+      }
+
+      .notice ul {
+        margin: 8px 0 0;
+      }
+
+      .choice-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .choice-button {
+        width: 100%;
+        min-height: 48px;
+        text-align: left;
+      }
+
+      .choice-button.active {
+        background: var(--warning);
+        color: #1a1000;
+      }
+
+      details {
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+
+      summary {
+        min-height: 38px;
+        cursor: pointer;
+      }
+
+      .sticky-actions {
+        position: sticky;
+        bottom: 0;
+        margin: 16px 0 0;
+        padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+        background: rgba(15, 20, 17, 0.96);
+        border-top: 1px solid var(--line);
+      }
+
+      .sticky-actions button {
+        width: 100%;
+      }
+
+      @media (max-width: 360px) {
+        .page,
+        nav {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+
+        .set-row,
+        .target-grid,
+        .stat-grid,
+        .bar-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="#today">今日训练</a>
+      <a href="#detail">训练详情</a>
+      <a href="#record">训练中</a>
+      <a href="#history">历史</a>
+      <a href="#profile">档案</a>
+      <a href="#nutrition">补剂</a>
+      <a href="#backup">备份</a>
+      <a href="#analytics">分析</a>
+    </nav>
+    <main id="app"></main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

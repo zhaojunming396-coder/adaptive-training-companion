@@ -163,7 +163,10 @@ export function renderTrainingDetailPage(root) {
   const startButton = document.createElement('button');
   startButton.textContent = '开始训练';
   startButton.disabled = detail.isRestDay;
-  startButton.addEventListener('click', () => navigateTo('record'));
+  startButton.addEventListener('click', () => {
+    appState.activeSession = null;
+    navigateTo('record');
+  });
   actions.appendChild(startButton);
 
   page.appendChild(actions);

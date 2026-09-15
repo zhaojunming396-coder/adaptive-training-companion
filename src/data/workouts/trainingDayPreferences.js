@@ -139,6 +139,27 @@ export function moveTrainingDayExercise(planDay, exerciseId, direction) {
   return saveTrainingDayExerciseIds(planDay, nextExerciseIds);
 }
 
+export function reorderTrainingDayExercise(planDay, exerciseId, targetIndex) {
+  const exerciseIds = getTrainingDayExerciseIds(planDay);
+  const currentIndex = exerciseIds.indexOf(exerciseId);
+  const nextIndex = Number(targetIndex);
+
+  if (
+    currentIndex < 0 ||
+    !Number.isInteger(nextIndex) ||
+    nextIndex < 0 ||
+    nextIndex >= exerciseIds.length ||
+    nextIndex === currentIndex
+  ) {
+    return exerciseIds;
+  }
+
+  const nextExerciseIds = exerciseIds.slice();
+  const [item] = nextExerciseIds.splice(currentIndex, 1);
+  nextExerciseIds.splice(nextIndex, 0, item);
+  return saveTrainingDayExerciseIds(planDay, nextExerciseIds);
+}
+
 export function removeTrainingDayExercise(planDay, exerciseId) {
   const exerciseIds = getTrainingDayExerciseIds(planDay);
 

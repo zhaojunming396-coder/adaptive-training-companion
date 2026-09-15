@@ -28,6 +28,7 @@ let restTimer = {
   intervalId: null
 };
 let setCompletionErrors = {};
+let selectedRecordExerciseId = '';
 const ACTIVE_WORKOUT_DRAFT_STORAGE_KEY = 'activeWorkoutDraft.v1';
 
 const memoryStorage = {
@@ -682,6 +683,101 @@ function getRestorableDraftSession(detail) {
   return hasSameExerciseOrder(draft.session, detail) ? draft.session : null;
 }
 
+function isExerciseLogComplete(log) {
+  return Array.isArray(log && log.sets) && log.sets.length > 0 && log.sets.every((set) => set.completed === true);
+}
+
+function getFirstIncompleteExerciseId(session) {
+  const log = (Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [])
+    .find((item) => !isExerciseLogComplete(item));
+
+  return log ? log.exerciseId : '';
+}
+
+function getNextIncompleteExerciseId(session, currentExerciseId) {
+  const logs = Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [];
+  const currentIndex = logs.findIndex((log) => log.exerciseId === currentExerciseId);
+  const ordered = currentIndex >= 0
+    ? [...logs.slice(currentIndex + 1), ...logs.slice(0, currentIndex + 1)]
+    : logs;
+  const next = ordered.find((log) => !isExerciseLogComplete(log));
+
+  return next ? next.exerciseId : currentExerciseId;
+}
+
+function getExerciseName(log, exerciseDetailMap) {
+  const exercise = exerciseDetailMap.get(log.exerciseId);
+  return exercise && exercise.detail ? exercise.detail.nameZh : log.exerciseId;
+}
+
+function getCurrentExerciseLog(session) {
+  const logs = Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [];
+
+  if (logs.length === 0) {
+    return null;
+  }
+
+  if (!selectedRecordExerciseId || !logs.some((log) => log.exerciseId === selectedRecordExerciseId)) {
+    selectedRecordExerciseId = getFirstIncompleteExerciseId(session) || logs[0].exerciseId;
+  }
+
+  return logs.find((log) => log.exerciseId === selectedRecordExerciseId) || logs[0];
+}
+
+function renderExerciseSwitcher(session, exerciseDetailMap, onSelect) {
+  const logs = Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [];
+  const activeIndex = logs.findIndex((log) => log.exerciseId === selectedRecordExerciseId);
+  const card = document.createElement('section');
+  card.className = 'exercise-switcher';
+
+  const status = document.createElement('div');
+  status.className = 'exercise-switcher-status';
+  const activeText = activeIndex >= 0 ? `${activeIndex + 1}/${logs.length}` : `1/${logs.length}`;
+  status.innerHTML = `<strong>当前动作 ${activeText}</strong><span>只显示一个动作，减少上下滑动</span>`;
+  card.appendChild(status);
+
+  const select = document.createElement('select');
+  logs.forEach((log, index) => {
+    const option = document.createElement('option');
+    option.value = log.exerciseId;
+    option.textContent = `${index + 1}. ${getExerciseName(log, exerciseDetailMap)}${isExerciseLogComplete(log) ? ' · 已完成' : ''}`;
+    select.appendChild(option);
+  });
+  select.value = selectedRecordExerciseId;
+  select.addEventListener('change', () => onSelect(select.value));
+  card.appendChild(select);
+
+  const controls = document.createElement('div');
+  controls.className = 'exercise-switcher-controls';
+
+  const previous = document.createElement('button');
+  previous.type = 'button';
+  previous.className = 'secondary-button';
+  previous.textContent = '上一个动作';
+  previous.disabled = activeIndex <= 0;
+  previous.addEventListener('click', () => {
+    if (activeIndex > 0) {
+      onSelect(logs[activeIndex - 1].exerciseId);
+    }
+  });
+  controls.appendChild(previous);
+
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'secondary-button';
+  next.textContent = '下一个动作';
+  next.disabled = activeIndex < 0 || activeIndex >= logs.length - 1;
+  next.addEventListener('click', () => {
+    if (activeIndex >= 0 && activeIndex < logs.length - 1) {
+      onSelect(logs[activeIndex + 1].exerciseId);
+    }
+  });
+  controls.appendChild(next);
+
+  card.appendChild(controls);
+  return card;
+}
+
 function renderSession(root, session, detail, messages = []) {
   const exerciseDetailMap = getExerciseDetailMap(detail);
   const history = readWorkoutHistory();
@@ -714,6 +810,11 @@ function renderSession(root, session, detail, messages = []) {
   }
 
   page.appendChild(renderTrainingStatus(session));
+  getCurrentExerciseLog(session);
+  page.appendChild(renderExerciseSwitcher(session, exerciseDetailMap, (exerciseId) => {
+    selectedRecordExerciseId = exerciseId;
+    renderSession(root, appState.activeSession, detail);
+  }));
 
   const onSetChange = (exerciseId, setIndex, patch, wasCompleted = false, exercise = null) => {
     const errorKey = getSetErrorKey(exerciseId, setIndex);
@@ -764,6 +865,15 @@ function renderSession(root, session, detail, messages = []) {
       return;
     }
 
+    if (becameCompleted) {
+      const updatedLog = (Array.isArray(appState.activeSession.exerciseLogs) ? appState.activeSession.exerciseLogs : [])
+        .find((log) => log.exerciseId === exerciseId);
+
+      if (isExerciseLogComplete(updatedLog)) {
+        selectedRecordExerciseId = getNextIncompleteExerciseId(appState.activeSession, exerciseId);
+      }
+    }
+
     renderSession(root, appState.activeSession, detail);
 
     if (becameCompleted) {
@@ -771,7 +881,10 @@ function renderSession(root, session, detail, messages = []) {
     }
   };
 
-  session.exerciseLogs.forEach((log) => {
+  const activeLog = getCurrentExerciseLog(session);
+
+  if (activeLog) {
+    const log = activeLog;
     const exercise = exerciseDetailMap.get(log.exerciseId);
     const fullExercise = getFullExercise(log.exerciseId);
     const card = document.createElement('article');
@@ -795,7 +908,7 @@ function renderSession(root, session, detail, messages = []) {
       card.appendChild(renderSetInput(log, set, exercise, onSetChange, error));
     });
     page.appendChild(card);
-  });
+  }
 
   const notePanel = document.createElement('details');
   notePanel.className = 'exercise compact-details';

@@ -261,6 +261,38 @@
         flex: 0 0 auto;
       }
 
+      .exercise-switcher {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 12px;
+        margin-bottom: 12px;
+        background: var(--surface);
+      }
+
+      .exercise-switcher-status {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .exercise-switcher-status strong {
+        flex: 0 0 auto;
+      }
+
+      .exercise-switcher-status span {
+        text-align: right;
+        font-size: 13px;
+      }
+
+      .exercise-switcher-controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
       .compact-details {
         border-top: 1px solid var(--line);
         padding-top: 8px;

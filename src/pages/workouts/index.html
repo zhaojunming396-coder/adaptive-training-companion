@@ -213,6 +213,66 @@
         margin-bottom: 12px;
       }
 
+      .record-header {
+        padding: 4px 0 8px;
+      }
+
+      .record-header h1,
+      .record-header p {
+        margin-bottom: 4px;
+      }
+
+      .training-status-card {
+        position: sticky;
+        top: 72px;
+        z-index: 1;
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 12px;
+        margin-bottom: 12px;
+        background: rgba(23, 31, 26, 0.96);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      .training-status-header,
+      .training-status-rest {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .training-status-header strong {
+        font-size: 20px;
+      }
+
+      .training-status-header span,
+      .training-status-rest span {
+        font-size: 13px;
+      }
+
+      .training-status-progress {
+        margin: 0;
+      }
+
+      .training-status-rest button {
+        flex: 0 0 auto;
+      }
+
+      .compact-details {
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+      }
+
+      .compact-details > summary {
+        min-height: 34px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
       .hero-card {
         border: 1px solid var(--line);
         border-radius: 24px;
@@ -297,7 +357,7 @@
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 12px;
-        margin: 10px 0 12px;
+        margin: 8px 0;
         background: rgba(52, 199, 89, 0.08);
       }
 
@@ -307,7 +367,7 @@
         border: 1px solid rgba(255, 176, 32, 0.38);
         border-radius: 14px;
         padding: 12px;
-        margin: 10px 0 12px;
+        margin: 8px 0;
         background: rgba(255, 176, 32, 0.1);
       }
 

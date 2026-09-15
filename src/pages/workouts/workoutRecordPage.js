@@ -28,6 +28,43 @@ let restTimer = {
   intervalId: null
 };
 let setCompletionErrors = {};
+const ACTIVE_WORKOUT_DRAFT_STORAGE_KEY = 'activeWorkoutDraft.v1';
+
+const memoryStorage = {
+  data: {},
+  getItem(key) {
+    return this.data[key] || null;
+  },
+  setItem(key, value) {
+    this.data[key] = value;
+  },
+  removeItem(key) {
+    delete this.data[key];
+  }
+};
+
+function getRuntimeStorage() {
+  if (typeof wx !== 'undefined' && wx && wx.getStorageSync && wx.setStorageSync && wx.removeStorageSync) {
+    return {
+      getItem(key) {
+        const value = wx.getStorageSync(key);
+        return value === undefined || value === null || value === '' ? null : JSON.stringify(value);
+      },
+      setItem(key, value) {
+        wx.setStorageSync(key, JSON.parse(value));
+      },
+      removeItem(key) {
+        wx.removeStorageSync(key);
+      }
+    };
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    return localStorage;
+  }
+
+  return memoryStorage;
+}
 
 function getExerciseDetailMap(detail) {
   return new Map(detail.exercises.map((item) => [item.exerciseId, item]));
@@ -40,11 +77,42 @@ function getFullExercise(exerciseId) {
 function setPatchFromInput(input) {
   const field = input.dataset.field;
 
-  if (field === 'completed') {
-    return { completed: input.checked };
+  return { [field]: toNumberOrNull(input.value) };
+}
+
+function readWorkoutDraft() {
+  const storage = getRuntimeStorage();
+
+  try {
+    const raw = storage.getItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && parsed.session ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorkoutDraft(session, detail) {
+  const storage = getRuntimeStorage();
+
+  if (!session || !detail || detail.isRestDay) {
+    return;
   }
 
-  return { [field]: toNumberOrNull(input.value) };
+  storage.setItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY, JSON.stringify({
+    planDayId: detail.planDayId,
+    exerciseIds: getDetailExerciseIds(detail),
+    session,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+function clearWorkoutDraft() {
+  const storage = getRuntimeStorage();
+
+  if (storage && storage.removeItem) {
+    storage.removeItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY);
+  }
 }
 
 function getSetFields(exercise) {
@@ -485,16 +553,19 @@ function renderSetInput(log, set, exercise, onChange, error = null) {
     row.appendChild(wrapper);
   });
 
-  const completedLabel = document.createElement('label');
-  completedLabel.className = 'set-completed';
-  const completed = document.createElement('input');
-  completed.type = 'checkbox';
-  completed.checked = set.completed;
+  const completed = document.createElement('button');
+  completed.type = 'button';
+  completed.className = set.completed ? 'set-complete-button set-complete-button-done' : 'set-complete-button secondary-button';
+  completed.textContent = set.completed ? '已完成本组' : '完成本组';
   completed.dataset.field = 'completed';
-  completed.addEventListener('change', () => onChange(log.exerciseId, set.setIndex, setPatchFromInput(completed), set.completed, exercise));
-  completedLabel.appendChild(completed);
-  completedLabel.append('已完成');
-  row.appendChild(completedLabel);
+  completed.addEventListener('click', () => onChange(
+    log.exerciseId,
+    set.setIndex,
+    { completed: !set.completed },
+    set.completed,
+    exercise
+  ));
+  row.appendChild(completed);
 
   if (error) {
     const errorText = document.createElement('p');
@@ -594,6 +665,16 @@ function hasSameExerciseOrder(session, detail) {
   return sessionIds.length === detailIds.length && sessionIds.every((exerciseId, index) => exerciseId === detailIds[index]);
 }
 
+function getRestorableDraftSession(detail) {
+  const draft = readWorkoutDraft();
+
+  if (!draft || !draft.session || draft.planDayId !== detail.planDayId) {
+    return null;
+  }
+
+  return hasSameExerciseOrder(draft.session, detail) ? draft.session : null;
+}
+
 function renderSession(root, session, detail, messages = []) {
   const exerciseDetailMap = getExerciseDetailMap(detail);
   const history = readWorkoutHistory();
@@ -634,6 +715,7 @@ function renderSession(root, session, detail, messages = []) {
     const errorKey = getSetErrorKey(exerciseId, setIndex);
     const exerciseName = exercise && exercise.detail ? exercise.detail.nameZh : exerciseId;
     const currentSet = getSetByIndex(appState.activeSession, exerciseId, setIndex) || {};
+    const isCompletionChange = Object.prototype.hasOwnProperty.call(patch, 'completed');
 
     if (patch.completed === true && wasCompleted !== true) {
       const nextSet = { ...currentSet, ...patch };
@@ -655,6 +737,7 @@ function renderSession(root, session, detail, messages = []) {
     }
 
     appState.activeSession = updateWorkoutSet(appState.activeSession, exerciseId, setIndex, patch);
+    saveWorkoutDraft(appState.activeSession, detail);
     const becameCompleted = patch.completed === true && wasCompleted !== true;
 
     if (patch.completed !== true && setCompletionErrors[errorKey]) {
@@ -671,6 +754,10 @@ function renderSession(root, session, detail, messages = []) {
       } else {
         setCompletionErrors[errorKey] = validation;
       }
+    }
+
+    if (!isCompletionChange) {
+      return;
     }
 
     renderSession(root, appState.activeSession, detail);
@@ -709,6 +796,7 @@ function renderSession(root, session, detail, messages = []) {
       ...appState.activeSession,
       notes: notes.value
     };
+    saveWorkoutDraft(appState.activeSession, detail);
   });
   noteLabel.appendChild(notes);
   page.appendChild(noteLabel);
@@ -748,6 +836,7 @@ function renderSession(root, session, detail, messages = []) {
     }
 
     appState.activeSession = null;
+    clearWorkoutDraft();
     appState.lastWorkoutSummary = buildWorkoutSummary(result.session);
     renderWorkoutSummary(root, appState.lastWorkoutSummary, detail, result.session);
   });
@@ -779,14 +868,21 @@ export function renderWorkoutRecordPage(root) {
     return;
   }
 
+  if (!appState.activeSession) {
+    appState.activeSession = getRestorableDraftSession(detail) || createWorkoutSession({
+      planDayId: appState.selectedPlanDayId || undefined
+    });
+    saveWorkoutDraft(appState.activeSession, detail);
+  }
+
   if (
-    !appState.activeSession ||
     appState.activeSession.planDayId !== detail.planDayId ||
     !hasSameExerciseOrder(appState.activeSession, detail)
   ) {
     appState.activeSession = createWorkoutSession({
       planDayId: appState.selectedPlanDayId || undefined
     });
+    saveWorkoutDraft(appState.activeSession, detail);
   }
 
   renderSession(root, appState.activeSession, detail);

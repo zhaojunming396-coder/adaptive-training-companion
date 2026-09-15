@@ -148,6 +148,7 @@
         padding: 8px 10px;
         color: var(--text);
         background: var(--surface-2);
+        font-size: 16px;
       }
 
       textarea {
@@ -160,6 +161,7 @@
         padding: 10px;
         color: var(--text);
         background: var(--surface-2);
+        font-size: 16px;
       }
 
       .page,
@@ -633,6 +635,7 @@
 
       .set-title,
       .set-completed,
+      .set-complete-button,
       .set-error-text {
         grid-column: 1 / -1;
       }
@@ -660,6 +663,16 @@
       .set-completed input {
         width: 22px;
         min-height: 22px;
+      }
+
+      .set-complete-button {
+        width: 100%;
+        min-height: 48px;
+      }
+
+      .set-complete-button-done {
+        color: #06120a;
+        background: var(--accent);
       }
 
       .set-error-text {

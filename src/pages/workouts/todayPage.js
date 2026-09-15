@@ -23,6 +23,17 @@ import {
   trainingDayOptions
 } from './appState.js';
 import { bodyRecomposition4DayPlan } from '../../data/trainingPlans/bodyRecomposition4DayPlan.js';
+import { exercises } from '../../data/exercises/exercises.js';
+import {
+  addTrainingDayExercise,
+  getAvailableTrainingDayExerciseIds,
+  getTrainingDayExerciseIds,
+  MAX_SESSION_EXERCISE_COUNT,
+  MIN_SESSION_EXERCISE_COUNT,
+  moveTrainingDayExercise,
+  removeTrainingDayExercise,
+  resetTrainingDayExerciseIds
+} from '../../data/workouts/trainingDayPreferences.js';
 import {
   getTodayProteinProgress,
   getTodaySupplementStatus
@@ -135,7 +146,6 @@ function buildTrainingFeedback({ history, selection, detail }) {
   const previousSameDay = detail && detail.planDayId
     ? getPreviousSamePlanDay(history, detail.planDayId)
     : null;
-  const previousVolume = previousSameDay ? getSessionVolume(previousSameDay) : 0;
   const recentVolume = volumeTrend.length > 0 ? volumeTrend[volumeTrend.length - 1].volume : 0;
   const weekPercent = plannedCount > 0
     ? Math.min(100, Math.round((overview.weeklyTrainingCount / plannedCount) * 100))
@@ -403,6 +413,142 @@ function getManualPlanDay(planDayId) {
   return bodyRecomposition4DayPlan.planDays.find((day) => day.planDayId === planDayId) || null;
 }
 
+function getExerciseNameById(detail, exerciseId) {
+  const exercise = (detail.exercises || []).find((item) => item.exerciseId === exerciseId);
+  const fullExercise = exercises.find((item) => item.id === exerciseId);
+  return exercise && exercise.detail && exercise.detail.nameZh
+    ? exercise.detail.nameZh
+    : fullExercise && fullExercise.nameZh
+      ? fullExercise.nameZh
+      : exerciseId;
+}
+
+function getPlanExerciseNameById(detail, exerciseId) {
+  return getExerciseNameById(detail, exerciseId);
+}
+
+function renderExercisePlanner(page, detail, root) {
+  const planDay = getManualPlanDay(detail.planDayId);
+
+  if (!planDay) {
+    return;
+  }
+
+  const selectedIds = getTrainingDayExerciseIds(planDay);
+  const hiddenIds = getAvailableTrainingDayExerciseIds(planDay);
+  const card = document.createElement('section');
+  card.className = 'exercise planner-card';
+
+  const header = document.createElement('div');
+  header.className = 'planner-header';
+
+  const titleGroup = document.createElement('div');
+  const title = document.createElement('h2');
+  title.textContent = '本次动作顺序';
+  const hint = document.createElement('p');
+  hint.className = 'source-line';
+  hint.textContent = `当前 ${selectedIds.length} 个动作，建议保持 ${MIN_SESSION_EXERCISE_COUNT}-${MAX_SESSION_EXERCISE_COUNT} 个。`;
+  titleGroup.appendChild(title);
+  titleGroup.appendChild(hint);
+  header.appendChild(titleGroup);
+
+  const resetButton = document.createElement('button');
+  resetButton.className = 'secondary-button compact-button';
+  resetButton.textContent = '恢复默认';
+  resetButton.addEventListener('click', () => {
+    resetTrainingDayExerciseIds(planDay);
+    appState.activeSession = null;
+    renderTodayPage(root);
+  });
+  header.appendChild(resetButton);
+  card.appendChild(header);
+
+  const list = document.createElement('div');
+  list.className = 'planner-list';
+  selectedIds.forEach((exerciseId, index) => {
+    const row = document.createElement('div');
+    row.className = 'planner-row';
+
+    const order = document.createElement('span');
+    order.className = 'planner-order';
+    order.textContent = String(index + 1);
+    row.appendChild(order);
+
+    const name = document.createElement('strong');
+    name.textContent = getExerciseNameById(detail, exerciseId);
+    row.appendChild(name);
+
+    const controls = document.createElement('div');
+    controls.className = 'planner-controls';
+
+    const up = document.createElement('button');
+    up.className = 'secondary-button icon-button';
+    up.textContent = '↑';
+    up.title = '上移';
+    up.disabled = index === 0;
+    up.addEventListener('click', () => {
+      moveTrainingDayExercise(planDay, exerciseId, 'up');
+      appState.activeSession = null;
+      renderTodayPage(root);
+    });
+    controls.appendChild(up);
+
+    const down = document.createElement('button');
+    down.className = 'secondary-button icon-button';
+    down.textContent = '↓';
+    down.title = '下移';
+    down.disabled = index === selectedIds.length - 1;
+    down.addEventListener('click', () => {
+      moveTrainingDayExercise(planDay, exerciseId, 'down');
+      appState.activeSession = null;
+      renderTodayPage(root);
+    });
+    controls.appendChild(down);
+
+    const remove = document.createElement('button');
+    remove.className = 'secondary-button compact-button';
+    remove.textContent = '移除';
+    remove.disabled = selectedIds.length <= MIN_SESSION_EXERCISE_COUNT;
+    remove.addEventListener('click', () => {
+      removeTrainingDayExercise(planDay, exerciseId);
+      appState.activeSession = null;
+      renderTodayPage(root);
+    });
+    controls.appendChild(remove);
+
+    row.appendChild(controls);
+    list.appendChild(row);
+  });
+  card.appendChild(list);
+
+  if (hiddenIds.length > 0) {
+    const addTitle = document.createElement('p');
+    addTitle.className = 'muted';
+    addTitle.textContent = selectedIds.length >= MAX_SESSION_EXERCISE_COUNT
+      ? '已经达到 6 个动作，想加新动作需要先移除一个。'
+      : '需要时可以把下面动作加回本次训练。';
+    card.appendChild(addTitle);
+
+    const addGrid = document.createElement('div');
+    addGrid.className = 'planner-add-grid';
+    hiddenIds.forEach((exerciseId) => {
+      const button = document.createElement('button');
+      button.className = 'secondary-button';
+      button.textContent = `加回：${getPlanExerciseNameById(detail, exerciseId)}`;
+      button.disabled = selectedIds.length >= MAX_SESSION_EXERCISE_COUNT;
+      button.addEventListener('click', () => {
+        addTrainingDayExercise(planDay, exerciseId);
+        appState.activeSession = null;
+        renderTodayPage(root);
+      });
+      addGrid.appendChild(button);
+    });
+    card.appendChild(addGrid);
+  }
+
+  page.appendChild(card);
+}
+
 function renderManualSelector(page, root) {
   const card = document.createElement('section');
   card.className = 'exercise';
@@ -564,6 +710,7 @@ export function renderTodayPage(root) {
 
     page.appendChild(hero);
     renderFeedbackPanel(page, feedback);
+    renderExercisePlanner(page, detail, root);
     renderKeyExerciseFeedback(page, detail);
 
     const actions = document.createElement('div');

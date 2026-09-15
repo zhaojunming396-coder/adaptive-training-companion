@@ -1,5 +1,6 @@
 import { exercises as defaultExercises } from '../exercises/exercises.js';
 import { bodyRecomposition4DayPlan } from '../trainingPlans/bodyRecomposition4DayPlan.js';
+import { getEffectiveTrainingDayExercises } from './trainingDayPreferences.js';
 
 export const WORKOUT_HISTORY_STORAGE_KEY = 'workoutHistory.v1';
 export const DEFAULT_TIME_ZONE = 'Asia/Shanghai';
@@ -257,7 +258,8 @@ export function buildTrainingDayDetail({
   }
 
   const exerciseMap = getExerciseMap(exerciseList);
-  const enrichedExercises = selection.planDay.exercises.map((planExercise) => {
+  const effectiveExercises = getEffectiveTrainingDayExercises(selection.planDay);
+  const enrichedExercises = effectiveExercises.map((planExercise) => {
     const detail = exerciseMap.get(planExercise.exerciseId) || null;
 
     return {
@@ -306,7 +308,7 @@ export function createWorkoutSession({
 
   const sessionDate = formatDate(date, timeZone);
   const exerciseMap = getExerciseMap(exerciseList);
-  const exerciseLogs = planDay.exercises.map((planExercise) => {
+  const exerciseLogs = getEffectiveTrainingDayExercises(planDay).map((planExercise) => {
     const log = createExerciseLog(planExercise, exerciseMap.get(planExercise.exerciseId));
     return {
       ...log,

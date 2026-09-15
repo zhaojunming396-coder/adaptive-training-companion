@@ -535,6 +535,83 @@
         background: var(--warning);
       }
 
+      .planner-card {
+        display: grid;
+        gap: 12px;
+      }
+
+      .planner-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .planner-header h2,
+      .planner-header p {
+        margin-bottom: 4px;
+      }
+
+      .planner-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .planner-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 10px;
+        background: var(--surface-2);
+      }
+
+      .planner-row strong {
+        min-width: 0;
+        word-break: break-word;
+      }
+
+      .planner-order {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        color: #06120a;
+        background: var(--accent);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .planner-controls {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 46px 46px minmax(0, 1fr);
+        gap: 8px;
+      }
+
+      .icon-button {
+        width: 46px;
+        min-height: 42px;
+        padding: 8px;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .compact-button {
+        min-height: 42px;
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+
+      .planner-add-grid {
+        display: grid;
+        gap: 8px;
+      }
+
       .set-row {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));

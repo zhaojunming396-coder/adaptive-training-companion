@@ -317,21 +317,65 @@ function renderStatGrid(items) {
   return grid;
 }
 
-function renderProgress(session) {
+function renderTrainingStatus(session) {
   const progress = getWorkoutProgress(session);
   const card = document.createElement('section');
-  card.className = 'meta-card';
+  card.className = 'training-status-card';
 
-  const title = document.createElement('h2');
-  title.textContent = '训练进度';
-  card.appendChild(title);
+  const header = document.createElement('div');
+  header.className = 'training-status-header';
 
-  const grid = renderStatGrid([
-    ['已完成组数', `${progress.completedSets} / ${progress.totalSets} 组`],
-    ['动作进度', `${progress.completedExercises} / ${progress.totalExercises}`],
-    ['完成度', `${progress.percent}%`]
-  ]);
-  card.appendChild(grid);
+  const title = document.createElement('strong');
+  title.textContent = `${progress.completedSets}/${progress.totalSets} 组`;
+  header.appendChild(title);
+
+  const meta = document.createElement('span');
+  meta.textContent = `${progress.completedExercises}/${progress.totalExercises} 个动作 · ${progress.percent}%`;
+  header.appendChild(meta);
+  card.appendChild(header);
+
+  const bar = document.createElement('div');
+  bar.className = 'feedback-progress training-status-progress';
+  bar.innerHTML = `<span style="width: ${progress.percent}%"></span>`;
+  card.appendChild(bar);
+
+  const restLine = document.createElement('div');
+  restLine.className = 'training-status-rest';
+
+  const status = document.createElement('span');
+  status.dataset.restTimer = 'true';
+  status.textContent = restTimer.status || '完成一组后自动休息';
+  restLine.appendChild(status);
+
+  const skip = document.createElement('button');
+  skip.type = 'button';
+  skip.className = 'secondary-button compact-button';
+  skip.textContent = '跳过';
+  skip.addEventListener('click', () => stopRestTimer('可以开始下一组'));
+  restLine.appendChild(skip);
+  card.appendChild(restLine);
+
+  const options = document.createElement('details');
+  options.className = 'compact-details';
+  const summary = document.createElement('summary');
+  summary.textContent = '休息提醒设置';
+  options.appendChild(summary);
+
+  const vibrationLabel = document.createElement('label');
+  vibrationLabel.className = 'set-completed';
+  const vibrationSwitch = document.createElement('input');
+  vibrationSwitch.type = 'checkbox';
+  vibrationSwitch.checked = appState.restVibrationEnabled;
+  const vibrationText = document.createElement('span');
+  vibrationText.textContent = `休息结束震动提醒：${appState.restVibrationEnabled ? '开启' : '关闭'}`;
+  vibrationSwitch.addEventListener('change', () => {
+    setRestVibrationEnabled(vibrationSwitch.checked);
+    vibrationText.textContent = `休息结束震动提醒：${appState.restVibrationEnabled ? '开启' : '关闭'}`;
+  });
+  vibrationLabel.appendChild(vibrationSwitch);
+  vibrationLabel.appendChild(vibrationText);
+  options.appendChild(vibrationLabel);
+  card.appendChild(options);
 
   return card;
 }
@@ -383,43 +427,6 @@ function startRestTimer(seconds) {
     restTimer.status = `休息中：${restTimer.secondsLeft} 秒`;
     updateRestTimerView();
   }, 1000);
-}
-
-function renderRestTimer() {
-  const card = document.createElement('section');
-  card.className = 'meta-card';
-
-  const title = document.createElement('h2');
-  title.textContent = '组间休息';
-  card.appendChild(title);
-
-  const status = document.createElement('p');
-  status.dataset.restTimer = 'true';
-  status.textContent = restTimer.status || '完成一组后自动开始休息倒计时。';
-  card.appendChild(status);
-
-  const vibrationLabel = document.createElement('label');
-  vibrationLabel.className = 'set-completed';
-  const vibrationSwitch = document.createElement('input');
-  vibrationSwitch.type = 'checkbox';
-  vibrationSwitch.checked = appState.restVibrationEnabled;
-  const vibrationText = document.createElement('span');
-  vibrationText.textContent = `休息结束震动提醒：${appState.restVibrationEnabled ? '开启' : '关闭'}`;
-  vibrationSwitch.addEventListener('change', () => {
-    setRestVibrationEnabled(vibrationSwitch.checked);
-    vibrationText.textContent = `休息结束震动提醒：${appState.restVibrationEnabled ? '开启' : '关闭'}`;
-  });
-  vibrationLabel.appendChild(vibrationSwitch);
-  vibrationLabel.appendChild(vibrationText);
-  card.appendChild(vibrationLabel);
-
-  const skip = document.createElement('button');
-  skip.className = 'secondary-button';
-  skip.textContent = '跳过倒计时';
-  skip.addEventListener('click', () => stopRestTimer('可以开始下一组'));
-  card.appendChild(skip);
-
-  return card;
 }
 
 function formatLastSet(set) {
@@ -685,9 +692,10 @@ function renderSession(root, session, detail, messages = []) {
   const page = document.createElement('section');
   page.className = 'page';
 
-  const title = document.createElement('h1');
-  title.textContent = '训练记录';
-  page.appendChild(title);
+  const header = document.createElement('section');
+  header.className = 'record-header';
+  header.innerHTML = `<p class="eyebrow">训练中</p><h1>${detail.nameZh}</h1><p>${session.date}</p>`;
+  page.appendChild(header);
 
   if (messages.length > 0) {
     const notice = document.createElement('div');
@@ -705,11 +713,7 @@ function renderSession(root, session, detail, messages = []) {
     page.appendChild(notice);
   }
 
-  const meta = document.createElement('p');
-  meta.textContent = `${session.date} / ${detail.nameZh}`;
-  page.appendChild(meta);
-  page.appendChild(renderProgress(session));
-  page.appendChild(renderRestTimer());
+  page.appendChild(renderTrainingStatus(session));
 
   const onSetChange = (exerciseId, setIndex, patch, wasCompleted = false, exercise = null) => {
     const errorKey = getSetErrorKey(exerciseId, setIndex);
@@ -776,8 +780,15 @@ function renderSession(root, session, detail, messages = []) {
     const name = document.createElement('h3');
     name.textContent = exercise && exercise.detail ? exercise.detail.nameZh : log.exerciseId;
     card.appendChild(name);
-    card.appendChild(renderLastPerformance(log.exerciseId));
-    card.appendChild(renderWeightRecommendation(fullExercise, exercise, history, userProfile));
+
+    const reference = document.createElement('details');
+    reference.className = 'compact-details';
+    const summary = document.createElement('summary');
+    summary.textContent = '上次记录 / 本次建议';
+    reference.appendChild(summary);
+    reference.appendChild(renderLastPerformance(log.exerciseId));
+    reference.appendChild(renderWeightRecommendation(fullExercise, exercise, history, userProfile));
+    card.appendChild(reference);
 
     log.sets.forEach((set) => {
       const error = setCompletionErrors[getSetErrorKey(log.exerciseId, set.setIndex)] || null;
@@ -786,8 +797,13 @@ function renderSession(root, session, detail, messages = []) {
     page.appendChild(card);
   });
 
+  const notePanel = document.createElement('details');
+  notePanel.className = 'exercise compact-details';
+  const noteSummary = document.createElement('summary');
+  noteSummary.textContent = '训练备注';
+  notePanel.appendChild(noteSummary);
   const noteLabel = document.createElement('label');
-  noteLabel.textContent = '训练备注';
+  noteLabel.textContent = '备注内容';
   const notes = document.createElement('textarea');
   notes.placeholder = '记录今天的状态、动作感受或需要下次注意的地方。';
   notes.value = session.notes || '';
@@ -799,7 +815,8 @@ function renderSession(root, session, detail, messages = []) {
     saveWorkoutDraft(appState.activeSession, detail);
   });
   noteLabel.appendChild(notes);
-  page.appendChild(noteLabel);
+  notePanel.appendChild(noteLabel);
+  page.appendChild(notePanel);
 
   const secondaryActions = document.createElement('div');
   secondaryActions.className = 'actions';

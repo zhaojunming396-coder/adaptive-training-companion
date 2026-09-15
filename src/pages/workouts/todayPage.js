@@ -31,6 +31,7 @@ import {
   MAX_SESSION_EXERCISE_COUNT,
   MIN_SESSION_EXERCISE_COUNT,
   moveTrainingDayExercise,
+  reorderTrainingDayExercise,
   removeTrainingDayExercise,
   resetTrainingDayExerciseIds
 } from '../../data/workouts/trainingDayPreferences.js';
@@ -481,6 +482,25 @@ function renderExercisePlanner(page, detail, root) {
     const controls = document.createElement('div');
     controls.className = 'planner-controls';
 
+    const positionLabel = document.createElement('label');
+    positionLabel.className = 'planner-position field-label';
+    positionLabel.append('顺序');
+    const position = document.createElement('select');
+    position.value = String(index);
+    selectedIds.forEach((_, optionIndex) => {
+      const option = document.createElement('option');
+      option.value = String(optionIndex);
+      option.textContent = `第 ${optionIndex + 1} 个`;
+      position.appendChild(option);
+    });
+    position.addEventListener('change', () => {
+      reorderTrainingDayExercise(planDay, exerciseId, Number(position.value));
+      appState.activeSession = null;
+      renderTodayPage(root);
+    });
+    positionLabel.appendChild(position);
+    controls.appendChild(positionLabel);
+
     const up = document.createElement('button');
     up.className = 'secondary-button icon-button';
     up.textContent = '↑';
@@ -705,7 +725,10 @@ export function renderTodayPage(root) {
 
     const startButton = document.createElement('button');
     startButton.textContent = '开始训练';
-    startButton.addEventListener('click', () => navigateTo('record'));
+    startButton.addEventListener('click', () => {
+      appState.activeSession = null;
+      navigateTo('record');
+    });
     hero.appendChild(startButton);
 
     page.appendChild(hero);

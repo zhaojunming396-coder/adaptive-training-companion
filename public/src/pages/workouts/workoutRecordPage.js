@@ -577,6 +577,23 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
   root.appendChild(page);
 }
 
+function getSessionExerciseIds(session) {
+  return (Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [])
+    .map((log) => log.exerciseId);
+}
+
+function getDetailExerciseIds(detail) {
+  return (Array.isArray(detail && detail.exercises) ? detail.exercises : [])
+    .map((exercise) => exercise.exerciseId);
+}
+
+function hasSameExerciseOrder(session, detail) {
+  const sessionIds = getSessionExerciseIds(session);
+  const detailIds = getDetailExerciseIds(detail);
+
+  return sessionIds.length === detailIds.length && sessionIds.every((exerciseId, index) => exerciseId === detailIds[index]);
+}
+
 function renderSession(root, session, detail, messages = []) {
   const exerciseDetailMap = getExerciseDetailMap(detail);
   const history = readWorkoutHistory();
@@ -762,7 +779,11 @@ export function renderWorkoutRecordPage(root) {
     return;
   }
 
-  if (!appState.activeSession || appState.activeSession.planDayId !== detail.planDayId) {
+  if (
+    !appState.activeSession ||
+    appState.activeSession.planDayId !== detail.planDayId ||
+    !hasSameExerciseOrder(appState.activeSession, detail)
+  ) {
     appState.activeSession = createWorkoutSession({
       planDayId: appState.selectedPlanDayId || undefined
     });

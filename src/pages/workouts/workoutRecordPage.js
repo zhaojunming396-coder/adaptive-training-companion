@@ -124,10 +124,7 @@ function getSetFields(exercise) {
   }
 
   if (trackingType === 'reps_only') {
-    return [
-      { field: 'reps', label: '次数' },
-      { field: 'rir', label: '剩余次数 RIR' }
-    ];
+    return [{ field: 'reps', label: '次数' }];
   }
 
   if (trackingType === 'distance_time') {
@@ -139,9 +136,13 @@ function getSetFields(exercise) {
 
   return [
     { field: 'weight', label: '重量（kg）' },
-    { field: 'reps', label: '次数' },
-    { field: 'rir', label: '剩余次数 RIR' }
+    { field: 'reps', label: '次数' }
   ];
+}
+
+function shouldTrackRir(exercise) {
+  const trackingType = exercise && exercise.detail ? exercise.detail.trackingType : 'weight_reps';
+  return trackingType === 'weight_reps' || trackingType === 'reps_only';
 }
 
 function getDetailForCurrentSelection() {
@@ -161,6 +162,7 @@ function getFieldLabel(field) {
   const labels = {
     weight: '重量',
     reps: '次数',
+    rir: 'RIR',
     durationSeconds: '时长',
     setIndex: '组序号',
     completed: '完成状态'
@@ -223,6 +225,10 @@ export function validateSetBeforeComplete({
     if (!hasFilledNumber(set && set.reps)) {
       missingFields.push('reps');
     }
+  }
+
+  if (shouldTrackRir(exercise) && !hasFilledNumber(set && set.rir)) {
+    missingFields.push('rir');
   }
 
   if (trackingType === 'time_based' && !hasFilledNumber(set && set.durationSeconds)) {
@@ -430,51 +436,38 @@ function startRestTimer(seconds) {
   }, 1000);
 }
 
-function formatLastSet(set) {
-  if (set.durationSeconds !== null && set.durationSeconds !== undefined && set.durationSeconds !== '') {
-    return `第 ${set.setIndex} 组：${set.durationSeconds} 秒${set.rir !== null && set.rir !== undefined ? `，RIR ${set.rir}` : ''}`;
-  }
-
-  if (set.weight !== null && set.weight !== undefined && set.reps !== null && set.reps !== undefined) {
-    return `第 ${set.setIndex} 组：${set.weight}${set.weightUnit || 'kg'} × ${set.reps}${set.rir !== null && set.rir !== undefined ? `，RIR ${set.rir}` : ''}`;
-  }
-
-  if (set.reps !== null && set.reps !== undefined) {
-    return `第 ${set.setIndex} 组：${set.reps} 次${set.rir !== null && set.rir !== undefined ? `，RIR ${set.rir}` : ''}`;
-  }
-
-  return `第 ${set.setIndex} 组：已完成`;
-}
-
-function renderLastPerformance(exerciseId) {
+function summarizeLastPerformance(exerciseId) {
   const performance = getLastExercisePerformance(exerciseId, {
     excludeSessionId: appState.activeSession && appState.activeSession.id
   });
-  const card = document.createElement('div');
-  card.className = 'last-record';
-
-  const title = document.createElement('strong');
-  title.textContent = '上次记录';
-  card.appendChild(title);
 
   if (!performance || !Array.isArray(performance.sets) || performance.sets.length === 0) {
-    const empty = document.createElement('p');
-    empty.textContent = '暂无上次记录';
-    card.appendChild(empty);
-    return card;
+    return null;
   }
 
-  const list = document.createElement('ul');
-  performance.sets.forEach((set) => {
-    const item = document.createElement('li');
-    item.textContent = formatLastSet(set);
-    list.appendChild(item);
-  });
-  card.appendChild(list);
-  return card;
+  const weights = performance.sets.map((set) => toNumberOrNull(set.weight)).filter((value) => value !== null);
+  const reps = performance.sets.map((set) => toNumberOrNull(set.reps)).filter((value) => value !== null);
+  const rirs = performance.sets.map((set) => toNumberOrNull(set.rir)).filter((value) => value !== null);
+  const durations = performance.sets.map((set) => toNumberOrNull(set.durationSeconds)).filter((value) => value !== null);
+  const uniqueWeights = [...new Set(weights)];
+
+  return {
+    date: performance.date || '',
+    weightText: uniqueWeights.length === 1
+      ? `${uniqueWeights[0]}kg`
+      : uniqueWeights.length > 1
+        ? `${Math.min(...uniqueWeights)}-${Math.max(...uniqueWeights)}kg`
+        : '',
+    repsText: reps.length > 0 ? reps.join(' / ') : '',
+    durationText: durations.length > 0 ? durations.map((value) => `${value}秒`).join(' / ') : '',
+    averageRir: rirs.length > 0
+      ? Number((rirs.reduce((sum, value) => sum + value, 0) / rirs.length).toFixed(1))
+      : null
+  };
 }
 
-function renderWeightRecommendation(exercise, planExercise, history, userProfile) {
+function renderExerciseGuidance(exerciseId, exercise, planExercise, history, userProfile) {
+  const performance = summarizeLastPerformance(exerciseId);
   const lastExerciseLog = getLastCompletedExerciseLog(planExercise.exerciseId, history);
   const recommendation = recommendWeightForTarget({
     exercise,
@@ -482,52 +475,90 @@ function renderWeightRecommendation(exercise, planExercise, history, userProfile
     lastExerciseLog,
     userProfile
   });
-  const card = document.createElement('div');
-  card.className = 'recommendation-card';
+  const wrapper = document.createElement('section');
+  wrapper.className = 'exercise-guidance';
 
-  const title = document.createElement('strong');
-  title.textContent = '本次建议';
-  card.appendChild(title);
+  const last = document.createElement('div');
+  last.className = 'guidance-block';
+  last.innerHTML = performance
+    ? `<span class="guidance-label">上次训练${performance.date ? ` · ${performance.date}` : ''}</span>
+       <strong>${performance.weightText || performance.durationText || '已完成'}</strong>
+       <span>${performance.repsText ? `${performance.repsText} 次` : performance.durationText}${performance.averageRir !== null ? ` · 平均 RIR ${performance.averageRir}` : ''}</span>`
+    : '<span class="guidance-label">上次训练</span><strong>暂无记录</strong><span>本次先建立可靠基准</span>';
+  wrapper.appendChild(last);
 
-  const disclaimer = document.createElement('p');
-  disclaimer.textContent = '建议重量仅供参考，请以动作稳定和 RIR 为准。';
-  card.appendChild(disclaimer);
+  const today = document.createElement('div');
+  today.className = 'guidance-block guidance-today';
+  const suggestedValue = recommendation.type === 'time'
+    ? recommendation.suggestedDurationText
+    : recommendation.suggestedWeightText;
+  today.innerHTML = `<span class="guidance-label">今天建议</span>
+    <strong>${suggestedValue || '自主选择'}</strong>
+    <span>${recommendation.suggestedRepsText ? `目标 ${recommendation.suggestedRepsText}` : recommendation.strategy}</span>
+    <span class="guidance-strategy">${recommendation.strategy}</span>`;
+  wrapper.appendChild(today);
 
-  const value = document.createElement('p');
-  if (recommendation.type === 'time') {
-    value.textContent = `建议时长：${recommendation.suggestedDurationText || '暂无建议'}`;
-  } else {
-    value.textContent = `建议使用：${recommendation.suggestedWeightText || '暂无建议'}`;
-  }
-  card.appendChild(value);
+  const reason = document.createElement('details');
+  reason.className = 'guidance-reason';
+  const summary = document.createElement('summary');
+  summary.textContent = '为什么这样建议';
+  reason.appendChild(summary);
+  const explanation = document.createElement('p');
+  explanation.textContent = recommendation.reason;
+  reason.appendChild(explanation);
+  wrapper.appendChild(reason);
 
-  if (recommendation.rawEstimatedWeightText) {
-    const raw = document.createElement('p');
-    raw.textContent = `原始估算：${recommendation.rawEstimatedWeightText}`;
-    card.appendChild(raw);
-  }
+  return wrapper;
+}
 
-  if (recommendation.roundingNote) {
-    const rounding = document.createElement('p');
-    rounding.textContent = `取整说明：${recommendation.roundingNote}`;
-    card.appendChild(rounding);
-  }
+const RIR_OPTIONS = [
+  { value: 0, label: '0', hint: '力竭' },
+  { value: 1, label: '1', hint: '约1次' },
+  { value: 2, label: '2', hint: '约2次' },
+  { value: 3, label: '3', hint: '约3次' },
+  { value: 4, label: '4+', hint: '余力足' }
+];
 
-  const strategy = document.createElement('p');
-  strategy.textContent = `策略：${recommendation.strategy}`;
-  card.appendChild(strategy);
+function renderRirPicker(log, set, onChange) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'rir-picker';
+  const currentRir = toNumberOrNull(set.rir);
 
-  const reason = document.createElement('p');
-  reason.textContent = `原因：${recommendation.reason}`;
-  card.appendChild(reason);
+  const heading = document.createElement('div');
+  heading.className = 'rir-picker-heading';
+  heading.innerHTML = '<strong>RIR</strong><span>这组结束时，还能再做几次？</span>';
+  wrapper.appendChild(heading);
 
-  if (recommendation.suggestedRepsText) {
-    const reps = document.createElement('p');
-    reps.textContent = `建议次数：${recommendation.suggestedRepsText}`;
-    card.appendChild(reps);
-  }
+  const choices = document.createElement('div');
+  choices.className = 'rir-options';
+  const buttons = [];
 
-  return card;
+  RIR_OPTIONS.forEach((option) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'rir-option';
+    button.innerHTML = `<strong>${option.label}</strong><span>${option.hint}</span>`;
+    button.setAttribute('aria-label', `RIR ${option.label}，${option.hint}`);
+    button.setAttribute('aria-pressed', String(currentRir === option.value));
+
+    if (currentRir === option.value) {
+      button.classList.add('active');
+    }
+
+    button.addEventListener('click', () => {
+      onChange(log.exerciseId, set.setIndex, { rir: option.value });
+      buttons.forEach((item) => {
+        const isActive = item === button;
+        item.classList.toggle('active', isActive);
+        item.setAttribute('aria-pressed', String(isActive));
+      });
+    });
+    buttons.push(button);
+    choices.appendChild(button);
+  });
+
+  wrapper.appendChild(choices);
+  return wrapper;
 }
 
 function renderSetInput(log, set, exercise, onChange, error = null) {
@@ -560,6 +591,10 @@ function renderSetInput(log, set, exercise, onChange, error = null) {
     wrapper.appendChild(input);
     row.appendChild(wrapper);
   });
+
+  if (shouldTrackRir(exercise)) {
+    row.appendChild(renderRirPicker(log, set, onChange));
+  }
 
   const completed = document.createElement('button');
   completed.type = 'button';
@@ -894,14 +929,7 @@ function renderSession(root, session, detail, messages = []) {
     name.textContent = exercise && exercise.detail ? exercise.detail.nameZh : log.exerciseId;
     card.appendChild(name);
 
-    const reference = document.createElement('details');
-    reference.className = 'compact-details';
-    const summary = document.createElement('summary');
-    summary.textContent = '上次记录 / 本次建议';
-    reference.appendChild(summary);
-    reference.appendChild(renderLastPerformance(log.exerciseId));
-    reference.appendChild(renderWeightRecommendation(fullExercise, exercise, history, userProfile));
-    card.appendChild(reference);
+    card.appendChild(renderExerciseGuidance(log.exerciseId, fullExercise, exercise, history, userProfile));
 
     log.sets.forEach((set) => {
       const error = setCompletionErrors[getSetErrorKey(log.exerciseId, set.setIndex)] || null;

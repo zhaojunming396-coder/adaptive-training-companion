@@ -387,26 +387,6 @@ function normalizeBaselineLifts(baselineLifts) {
   }));
 }
 
-function getIncreaseAmount(exercise) {
-  const category = exercise && exercise.category ? exercise.category : '';
-  const equipment = Array.isArray(exercise && exercise.equipment) ? exercise.equipment : [];
-  const id = exercise && exercise.id ? exercise.id : '';
-
-  if (category === 'isolation') {
-    return 1;
-  }
-
-  if (equipment.includes('dumbbell') || id.startsWith('db_') || id.includes('_db_')) {
-    return 2.5;
-  }
-
-  if (equipment.includes('barbell') || equipment.includes('machine')) {
-    return 5;
-  }
-
-  return 2.5;
-}
-
 function formatSeconds(seconds) {
   const value = Math.round(seconds);
 
@@ -421,6 +401,55 @@ function formatSeconds(seconds) {
 
 function formatWeightText(weight, unit = 'kg') {
   return toNumberOrNull(weight) === null ? '' : `${weight}${unit}`;
+}
+
+function getTargetSetCount(target) {
+  const value = Number(target && target.sets);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+function getAverage(values) {
+  return values.length > 0
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : null;
+}
+
+function formatAverage(value) {
+  return value === null ? null : Number(value.toFixed(1));
+}
+
+function buildSuggestedRepsText({
+  strategy,
+  completedReps,
+  targetReps,
+  targetRir,
+  averageRir,
+  targetSetCount,
+  completedAllWorkSets
+}) {
+  if (targetReps.min === null || targetReps.max === null) {
+    return '';
+  }
+
+  if (strategy === '建议加重量') {
+    return `${targetReps.min}-${targetReps.max} 次`;
+  }
+
+  const setCount = targetSetCount || completedReps.length || 1;
+  const canProgressReps = completedAllWorkSets &&
+    averageRir !== null &&
+    (targetRir === null || averageRir >= Math.max(0, targetRir - 0.5));
+  const targets = Array.from({ length: setCount }, (_, index) => {
+    const lastReps = completedReps[index];
+
+    if (canProgressReps && lastReps !== undefined) {
+      return Math.min(targetReps.max, Math.max(targetReps.min, lastReps + 1));
+    }
+
+    return targetReps.min;
+  });
+
+  return targets.join(' / ');
 }
 
 function buildEmptyRecommendation(reason = '暂无历史记录，请保守选择能完成目标次数且保留 1-2 次余力的重量。') {
@@ -574,6 +603,8 @@ export function getWeightRecommendationReason({
   strategy,
   completedReps = [],
   targetReps,
+  completedAllWorkSets = false,
+  allRirRecorded = false,
   hasHistory,
   hasBaseline
 } = {}) {
@@ -587,18 +618,26 @@ export function getWeightRecommendationReason({
     : '目标次数';
 
   if (strategy === '建议加重量') {
-    return `上次已完成 ${repsText} 次，达到 ${targetText} 的上限且余力达标，本次可以小幅加重量。`;
+    return `上次完成了全部工作组，${repsText} 次均达到 ${targetText} 上限，RIR 也达标，本次可以增加一个最小配重档位。`;
   }
 
   if (strategy === '建议降低重量') {
-    return `上次多数完成组低于 ${targetText} 或余力不足，本次建议降低重量，先把动作质量和目标次数做稳。`;
+    return `上次多数工作组低于 ${targetText}，且多组已接近力竭。本次降低一个最小配重档位，先把动作质量和目标次数做稳。`;
   }
 
   if (strategy === '参考基准力量') {
     return '暂无该动作历史训练记录，先使用你填写的基准力量作为保守参考。';
   }
 
-  return `上次完成 ${repsText || '部分'} 次，尚未稳定达到目标上限，本次建议维持重量，争取多做 1-2 次。`;
+  if (!completedAllWorkSets) {
+    return `上次没有完成全部工作组，本次先维持重量，把计划组数完整做完后再判断是否加重。`;
+  }
+
+  if (!allRirRecorded) {
+    return `上次完成 ${repsText || '部分'} 次，但 RIR 记录不完整。本次先维持重量并补齐 RIR，再判断是否加重。`;
+  }
+
+  return `上次完成 ${repsText || '部分'} 次，尚未稳定达到 ${targetText} 上限。本次维持重量，优先增加完成次数。`;
 }
 
 export function recommendWeightForTarget({
@@ -619,6 +658,7 @@ export function recommendWeightForTarget({
 
   const targetReps = parseTargetReps(planExercise && planExercise.target);
   const targetRir = parseTargetRir(planExercise && planExercise.target);
+  const targetSetCount = getTargetSetCount(planExercise && planExercise.target);
   const completedSets = getCompletedSets(lastExerciseLog);
   const weightSet = getLatestCompletedWeightSet(lastExerciseLog);
 
@@ -631,21 +671,39 @@ export function recommendWeightForTarget({
       .filter((rir) => rir !== null);
     const upper = targetReps.max;
     const lower = targetReps.min;
-    const allAtUpper = upper !== null && completedReps.length > 0 && completedReps.every((reps) => reps >= upper);
-    const rirReady = targetRir === null || completedRirs.length === 0 || completedRirs.every((rir) => rir >= targetRir);
+    const completedAllWorkSets = targetSetCount > 0
+      ? completedSets.length >= targetSetCount
+      : completedSets.length > 0;
+    const allRirRecorded = targetRir === null || (
+      completedSets.length > 0 && completedRirs.length === completedSets.length
+    );
+    const allAtUpper = completedAllWorkSets &&
+      upper !== null &&
+      completedReps.length >= (targetSetCount || completedSets.length) &&
+      completedReps.every((reps) => reps >= upper);
+    const rirReady = targetRir === null || (
+      allRirRecorded && completedRirs.every((rir) => rir >= targetRir)
+    );
     const belowLowerCount = lower === null ? 0 : completedReps.filter((reps) => reps < lower).length;
-    const lowRirCount = targetRir === null ? 0 : completedRirs.filter((rir) => rir < targetRir).length;
-    const majorityCount = Math.floor(Math.max(completedReps.length, completedRirs.length) / 2) + 1;
+    const nearFailureCount = completedRirs.filter((rir) => rir <= 1).length;
+    const majorityCount = Math.floor(completedSets.length / 2) + 1;
+    const averageRir = formatAverage(getAverage(completedRirs));
     const averageWeight = getAverageCompletedWeight(lastExerciseLog) || toNumberOrNull(weightSet.weight);
+    const equipmentRule = getEquipmentRule(fullExercise);
+    const weightStep = equipmentRule && equipmentRule.incrementKg ? equipmentRule.incrementKg : 2.5;
     let strategy = '建议维持重量';
     let suggestedWeight = averageWeight;
 
     if (allAtUpper && rirReady) {
       strategy = '建议加重量';
-      suggestedWeight = averageWeight + getIncreaseAmount(fullExercise);
-    } else if (belowLowerCount >= majorityCount || lowRirCount >= majorityCount) {
+      suggestedWeight = averageWeight + weightStep;
+    } else if (
+      completedAllWorkSets &&
+      belowLowerCount >= majorityCount &&
+      nearFailureCount >= majorityCount
+    ) {
       strategy = '建议降低重量';
-      suggestedWeight = averageWeight * 0.975;
+      suggestedWeight = Math.max(weightStep, averageWeight - weightStep);
     }
 
     const rounded = applyEquipmentWeightRule(suggestedWeight, fullExercise);
@@ -661,15 +719,29 @@ export function recommendWeightForTarget({
       rawEstimatedWeightText: formatWeightText(rounded.rawEstimatedWeight, weightSet.weightUnit || 'kg'),
       roundingIncrementKg: rounded.roundingIncrementKg,
       roundingNote: rounded.roundingNote,
-      suggestedRepsText: planExercise && planExercise.target && planExercise.target.reps ? `${planExercise.target.reps} 次` : '',
+      suggestedRepsText: buildSuggestedRepsText({
+        strategy,
+        completedReps,
+        targetReps,
+        targetRir,
+        averageRir,
+        targetSetCount,
+        completedAllWorkSets
+      }),
       suggestedDurationSeconds: null,
       suggestedDurationText: '',
       estimatedOneRepMax: calculateEstimatedOneRepMax(weightSet),
+      averageRir,
+      completedAllWorkSets,
+      completedSetCount: completedSets.length,
+      targetSetCount,
       strategy,
       reason: getWeightRecommendationReason({
         strategy,
         completedReps,
         targetReps,
+        completedAllWorkSets,
+        allRirRecorded,
         hasHistory: true,
         hasBaseline: false
       })
@@ -693,7 +765,9 @@ export function recommendWeightForTarget({
       rawEstimatedWeightText: formatWeightText(rounded.rawEstimatedWeight, baseline.weightUnit || 'kg'),
       roundingIncrementKg: rounded.roundingIncrementKg,
       roundingNote: rounded.roundingNote,
-      suggestedRepsText: baseline.reps ? `${baseline.reps} 次` : '',
+      suggestedRepsText: targetReps.min !== null && targetReps.max !== null
+        ? `${targetReps.min}-${targetReps.max} 次`
+        : '',
       suggestedDurationSeconds: null,
       suggestedDurationText: '',
       estimatedOneRepMax: calculateEstimatedOneRepMax(baseline),

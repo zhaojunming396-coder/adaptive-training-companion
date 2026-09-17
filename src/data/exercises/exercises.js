@@ -460,6 +460,7 @@ export const exercises = [
     "equipment": [
       "dumbbell"
     ],
+    "weightIncrementKg": 1,
     "difficulty": "beginner",
     "recommendedFor": [
       "beginner",
@@ -633,6 +634,7 @@ export const exercises = [
     "equipment": [
       "dumbbell"
     ],
+    "weightIncrementKg": 1,
     "difficulty": "beginner",
     "recommendedFor": [
       "beginner",
@@ -1686,6 +1688,7 @@ export const exercises = [
       "dumbbell",
       "bench"
     ],
+    "weightIncrementKg": 1,
     "difficulty": "beginner",
     "recommendedFor": [
       "beginner",

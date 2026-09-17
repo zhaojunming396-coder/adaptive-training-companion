@@ -188,7 +188,17 @@ function getSessionEndTime(session) {
 }
 
 function getCompletedSets(log) {
-  return Array.isArray(log && log.sets) ? log.sets.filter((set) => set.completed === true) : [];
+  return Array.isArray(log && log.sets) ? log.sets.filter((set) => {
+    if (set && set.completed === true) {
+      return true;
+    }
+
+    return set && set.completed === undefined && (
+      toNumberOrNull(set.weight) !== null ||
+      toNumberOrNull(set.reps) !== null ||
+      toNumberOrNull(set.durationSeconds) !== null
+    );
+  }) : [];
 }
 
 function parseRange(value, multiplier = 1) {
@@ -241,36 +251,55 @@ function roundToIncrement(value, increment = 0.5) {
   return Math.max(increment, Math.round(value / increment) * increment);
 }
 
-function getEquipmentRule(exercise) {
-  const customRules = readEquipmentWeightRules();
+function getEquipmentRule(exercise, customRules = readEquipmentWeightRules()) {
   const trackingType = exercise && exercise.trackingType ? exercise.trackingType : '';
   const equipment = Array.isArray(exercise && exercise.equipment) ? exercise.equipment : [];
   const id = exercise && exercise.id ? exercise.id : '';
+  const exerciseIncrement = toNumberOrNull(
+    exercise && (
+      exercise.weightIncrementKg ??
+      (exercise.loadProgression && exercise.loadProgression.incrementKg)
+    )
+  );
+
+  if (exerciseIncrement !== null && exerciseIncrement > 0) {
+    return {
+      incrementKg: exerciseIncrement,
+      note: `${exercise.nameZh || '该动作'}按动作配置的 ${exerciseIncrement}kg 档位调整。`,
+      source: 'exercise'
+    };
+  }
 
   if (trackingType === 'time_based' || equipment.includes('bodyweight')) {
-    return customRules.bodyweight;
+    return { ...customRules.bodyweight, source: 'equipment' };
   }
 
   if (equipment.includes('dumbbell') || id.startsWith('db_') || id.includes('_db_')) {
-    return customRules.dumbbell;
+    return { ...customRules.dumbbell, source: 'equipment' };
   }
 
   if (equipment.includes('barbell')) {
-    return customRules.barbell;
+    return { ...customRules.barbell, source: 'equipment' };
   }
 
   if (equipment.includes('cable_machine') || equipment.includes('lat_pulldown_machine')) {
-    return customRules.cable_machine;
+    return { ...customRules.cable_machine, source: 'equipment' };
   }
 
   if (equipment.includes('machine')) {
-    return customRules.machine;
+    return { ...customRules.machine, source: 'equipment' };
   }
 
   return {
     incrementKg: 2.5,
-    note: '未匹配到明确器械，默认按 2.5kg 档位取整。'
+    note: '未匹配到明确器械，默认按 2.5kg 档位取整。',
+    source: 'fallback'
   };
+}
+
+export function getWeightIncrementKg(exercise, customRules = equipmentWeightRules) {
+  const rule = getEquipmentRule(exercise, customRules);
+  return rule && rule.incrementKg ? rule.incrementKg : null;
 }
 
 export function readEquipmentWeightRules({ storage = getRuntimeStorage() } = {}) {
@@ -346,18 +375,6 @@ function getLatestCompletedWeightSet(log) {
     .sort((a, b) => a.setIndex - b.setIndex)[0] || null;
 }
 
-function getAverageCompletedWeight(log) {
-  const weights = getCompletedSets(log)
-    .map((set) => toNumberOrNull(set.weight))
-    .filter((weight) => weight !== null);
-
-  if (weights.length === 0) {
-    return null;
-  }
-
-  return weights.reduce((sum, weight) => sum + weight, 0) / weights.length;
-}
-
 function getBaselineLift(exerciseId, userProfile) {
   const baselineLifts = normalizeBaselineLifts(userProfile && userProfile.baselineLifts);
 
@@ -416,40 +433,6 @@ function getAverage(values) {
 
 function formatAverage(value) {
   return value === null ? null : Number(value.toFixed(1));
-}
-
-function buildSuggestedRepsText({
-  strategy,
-  completedReps,
-  targetReps,
-  targetRir,
-  averageRir,
-  targetSetCount,
-  completedAllWorkSets
-}) {
-  if (targetReps.min === null || targetReps.max === null) {
-    return '';
-  }
-
-  if (strategy === '建议加重量') {
-    return `${targetReps.min}-${targetReps.max} 次`;
-  }
-
-  const setCount = targetSetCount || completedReps.length || 1;
-  const canProgressReps = completedAllWorkSets &&
-    averageRir !== null &&
-    (targetRir === null || averageRir >= Math.max(0, targetRir - 0.5));
-  const targets = Array.from({ length: setCount }, (_, index) => {
-    const lastReps = completedReps[index];
-
-    if (canProgressReps && lastReps !== undefined) {
-      return Math.min(targetReps.max, Math.max(targetReps.min, lastReps + 1));
-    }
-
-    return targetReps.min;
-  });
-
-  return targets.join(' / ');
 }
 
 function buildEmptyRecommendation(reason = '暂无历史记录，请保守选择能完成目标次数且保留 1-2 次余力的重量。') {
@@ -564,26 +547,350 @@ export function upsertBaselineLift(baselineLift, { storage = getRuntimeStorage()
   return saveUserTrainingProfile({ ...profile, baselineLifts }, { storage });
 }
 
-export function getLastCompletedExerciseLog(exerciseId, history) {
+export function getRecentCompletedExerciseLogs(exerciseId, history, limit = 3) {
   const sortedHistory = (Array.isArray(history) ? history : [])
     .slice()
     .sort((a, b) => getSessionEndTime(b) - getSessionEndTime(a));
+  const logs = [];
 
   for (const session of sortedHistory) {
     const log = (Array.isArray(session.exerciseLogs) ? session.exerciseLogs : [])
       .find((item) => item.exerciseId === exerciseId && getCompletedSets(item).length > 0);
 
     if (log) {
-      return {
+      logs.push({
         ...log,
         sessionId: session.id,
         sessionDate: session.date,
         planDayId: session.planDayId
-      };
+      });
+
+      if (logs.length >= limit) {
+        break;
+      }
     }
   }
 
-  return null;
+  return logs.reverse();
+}
+
+export function getLastCompletedExerciseLog(exerciseId, history) {
+  const recent = getRecentCompletedExerciseLogs(exerciseId, history, 1);
+  return recent[0] || null;
+}
+
+function getDominantWeight(weights) {
+  const counts = new Map();
+
+  weights.forEach((weight) => {
+    counts.set(weight, (counts.get(weight) || 0) + 1);
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] ?? null;
+}
+
+function getRirTargetValue(target) {
+  const parsed = parseTargetRir(target);
+  return parsed === null ? 2 : parsed;
+}
+
+export function summarizeExercisePerformance(log, target = {}) {
+  const completedSets = getCompletedSets(log).slice().sort((a, b) => a.setIndex - b.setIndex);
+  const targetSetCount = getTargetSetCount(target) || completedSets.length;
+  const targetReps = parseTargetReps(target);
+  const plannedSets = completedSets.slice(0, targetSetCount || completedSets.length);
+  const reps = plannedSets.map((set) => toNumberOrNull(set.reps)).filter((value) => value !== null);
+  const weights = plannedSets.map((set) => toNumberOrNull(set.weight)).filter((value) => value !== null);
+  const rirValues = plannedSets.map((set) => toNumberOrNull(set.rir)).filter((value) => value !== null);
+  const lastPlannedSet = plannedSets[plannedSets.length - 1] || null;
+  const missingSetCount = Math.max(0, targetSetCount - completedSets.length);
+  const belowLowerCount = (targetReps.min === null
+    ? 0
+    : reps.filter((value) => value < targetReps.min).length) + missingSetCount;
+  const atUpperCount = targetReps.max === null
+    ? 0
+    : reps.filter((value) => value >= targetReps.max).length;
+  const nearFailureCount = rirValues.filter((value) => value <= 1).length;
+  const averageRir = formatAverage(getAverage(rirValues));
+  const minimumRir = rirValues.length > 0 ? Math.min(...rirValues) : null;
+  const lastRir = lastPlannedSet ? toNumberOrNull(lastPlannedSet.rir) : null;
+  const completedAllWorkSets = targetSetCount > 0 &&
+    completedSets.length >= targetSetCount &&
+    reps.length >= targetSetCount;
+  const majorityCount = Math.floor(Math.max(targetSetCount, 1) / 2) + 1;
+  const allWithinTargetRange = completedAllWorkSets &&
+    targetReps.min !== null &&
+    reps.every((value) => value >= targetReps.min);
+  const allAtUpper = completedAllWorkSets &&
+    targetReps.max !== null &&
+    atUpperCount >= targetSetCount;
+  const rirCoverage = targetSetCount > 0
+    ? Math.min(1, rirValues.length / targetSetCount)
+    : 0;
+  const highStrain = rirValues.length > 0 && (
+    minimumRir === 0 ||
+    lastRir !== null && lastRir <= 1 ||
+    nearFailureCount >= majorityCount
+  );
+  const severeFailure = (
+    belowLowerCount >= majorityCount ||
+    completedSets.length < targetSetCount
+  ) && highStrain;
+
+  return {
+    sessionId: log && log.sessionId ? log.sessionId : '',
+    date: log && (log.sessionDate || log.date) ? (log.sessionDate || log.date) : '',
+    workingWeight: getDominantWeight(weights),
+    weightUnit: plannedSets[0] && plannedSets[0].weightUnit ? plannedSets[0].weightUnit : 'kg',
+    reps,
+    totalReps: reps.reduce((sum, value) => sum + value, 0),
+    targetSetCount,
+    completedSetCount: completedSets.length,
+    completedAllWorkSets,
+    allWithinTargetRange,
+    allAtUpper,
+    belowLowerCount,
+    atUpperCount,
+    averageRir,
+    minimumRir,
+    lastRir,
+    nearFailureCount,
+    rirCoverage,
+    highStrain,
+    severeFailure,
+    volume: plannedSets.reduce((sum, set) => {
+      const weight = toNumberOrNull(set.weight);
+      const repsValue = toNumberOrNull(set.reps);
+      return weight === null || repsValue === null ? sum : sum + weight * repsValue;
+    }, 0)
+  };
+}
+
+function hasSameWeight(left, right) {
+  return left && right &&
+    left.workingWeight !== null &&
+    right.workingWeight !== null &&
+    Math.abs(left.workingWeight - right.workingWeight) < 0.001;
+}
+
+function hasRobustRirForIncrease(summary, target) {
+  const requiredRir = Math.max(2, getRirTargetValue(target));
+  return summary.rirCoverage >= 2 / 3 &&
+    summary.averageRir !== null && summary.averageRir >= requiredRir &&
+    summary.minimumRir !== null && summary.minimumRir >= 2 &&
+    summary.lastRir !== null && summary.lastRir >= 2 &&
+    summary.nearFailureCount === 0;
+}
+
+function isMeaningfulDecline(previous, current) {
+  if (!hasSameWeight(previous, current)) {
+    return false;
+  }
+
+  const repsDeclined = current.totalReps <= previous.totalReps - 2;
+  const completionDeclined = current.completedSetCount < previous.completedSetCount ||
+    current.belowLowerCount > previous.belowLowerCount;
+  const rirDeclined = current.averageRir !== null && previous.averageRir !== null
+    ? current.averageRir < previous.averageRir
+    : current.highStrain;
+
+  return (repsDeclined || completionDeclined) && (rirDeclined || current.highStrain);
+}
+
+export function analyzeExerciseTrend(summaries, target = {}) {
+  const recent = (Array.isArray(summaries) ? summaries : []).filter(Boolean).slice(-3);
+  const latest = recent[recent.length - 1] || null;
+  const previous = recent[recent.length - 2] || null;
+
+  if (!latest) {
+    return {
+      sessionsUsed: 0,
+      latest: null,
+      previous: null,
+      failureStreak: 0,
+      declineTransitions: 0,
+      loadIncreased: false,
+      weightProgress: false,
+      repsProgress: false,
+      readyToIncrease: false,
+      recoveryWarning: false
+    };
+  }
+
+  const sameWeightTail = [];
+  for (let index = recent.length - 1; index >= 0; index -= 1) {
+    if (hasSameWeight(latest, recent[index])) {
+      sameWeightTail.unshift(recent[index]);
+    } else {
+      break;
+    }
+  }
+
+  let failureStreak = 0;
+  for (let index = sameWeightTail.length - 1; index >= 0; index -= 1) {
+    if (!sameWeightTail[index].severeFailure) {
+      break;
+    }
+    failureStreak += 1;
+  }
+
+  let declineTransitions = 0;
+  for (let index = recent.length - 1; index > 0; index -= 1) {
+    if (!isMeaningfulDecline(recent[index - 1], recent[index])) {
+      break;
+    }
+    declineTransitions += 1;
+  }
+
+  const loadIncreased = Boolean(previous &&
+    latest.workingWeight !== null &&
+    previous.workingWeight !== null &&
+    latest.workingWeight > previous.workingWeight);
+  const weightProgress = recent.some((summary, index) => index > 0 &&
+    summary.workingWeight !== null &&
+    recent[index - 1].workingWeight !== null &&
+    summary.workingWeight > recent[index - 1].workingWeight &&
+    summary.allWithinTargetRange
+  );
+  const repsProgress = Boolean(previous && hasSameWeight(previous, latest) &&
+    latest.totalReps > previous.totalReps);
+  const latestRirReady = hasRobustRirForIncrease(latest, target);
+  const previousConfirmsProgress = Boolean(previous && hasSameWeight(previous, latest) && (
+    previous.allAtUpper && hasRobustRirForIncrease(previous, target) ||
+    previous.allWithinTargetRange && latest.totalReps > previous.totalReps && !previous.highStrain
+  ));
+  const readyToIncrease = !loadIncreased &&
+    latest.allAtUpper &&
+    latestRirReady &&
+    previousConfirmsProgress;
+
+  return {
+    sessionsUsed: recent.length,
+    latest,
+    previous,
+    sameWeightSessionCount: sameWeightTail.length,
+    failureStreak,
+    declineTransitions,
+    loadIncreased,
+    weightProgress,
+    repsProgress,
+    latestRirReady,
+    readyToIncrease,
+    recoveryWarning: failureStreak >= 2 || declineTransitions >= 2
+  };
+}
+
+export function decideProgression(trend) {
+  const latest = trend && trend.latest;
+
+  if (!latest) {
+    return { strategy: '暂无建议', phase: 'baseline', direction: 'none' };
+  }
+
+  if (
+    trend.failureStreak >= 3 &&
+    latest.severeFailure &&
+    latest.highStrain &&
+    latest.belowLowerCount >= Math.floor(Math.max(latest.targetSetCount, 1) / 2) + 1
+  ) {
+    return { strategy: '建议降低重量', phase: 'confirmed_regression', direction: 'decrease' };
+  }
+
+  if (trend.readyToIncrease) {
+    return { strategy: '建议加重量', phase: 'ready_to_increase', direction: 'increase' };
+  }
+
+  if (trend.loadIncreased) {
+    return { strategy: '建议维持重量', phase: 'load_adaptation', direction: 'hold' };
+  }
+
+  if (latest.rirCoverage < 1) {
+    return { strategy: '建议维持重量', phase: 'rir_incomplete', direction: 'hold' };
+  }
+
+  if (trend.recoveryWarning) {
+    return { strategy: '建议维持重量', phase: 'recovery_watch', direction: 'hold' };
+  }
+
+  if (latest.allAtUpper && latest.highStrain) {
+    return { strategy: '建议维持重量', phase: 'top_range_high_strain', direction: 'hold' };
+  }
+
+  if (trend.repsProgress) {
+    return { strategy: '建议维持重量', phase: 'reps_progress', direction: 'hold' };
+  }
+
+  if (latest.severeFailure) {
+    return { strategy: '建议维持重量', phase: 'single_bad_session', direction: 'hold' };
+  }
+
+  return { strategy: '建议维持重量', phase: 'stable', direction: 'hold' };
+}
+
+export function buildNextRepTarget(summary, target = {}, decision = {}) {
+  const targetReps = parseTargetReps(target);
+
+  if (targetReps.min === null || targetReps.max === null) {
+    return '';
+  }
+
+  if (decision.direction === 'increase' || decision.direction === 'decrease') {
+    return `${targetReps.min}-${targetReps.max} 次`;
+  }
+
+  const setCount = getTargetSetCount(target) || summary.reps.length || 1;
+  const current = Array.from({ length: setCount }, (_, index) =>
+    Math.min(targetReps.max, Math.max(targetReps.min, summary.reps[index] ?? targetReps.min))
+  );
+  const canAddReps = [
+    'load_adaptation',
+    'reps_progress',
+    'stable'
+  ].includes(decision.phase) && !summary.highStrain;
+  const targets = canAddReps
+    ? current.map((value) => Math.min(targetReps.max, value + 1))
+    : current;
+
+  return targets.join(' / ');
+}
+
+export function buildTrendRecommendationReason({ decision, trend }) {
+  const evidenceText = `参考最近 ${trend.sessionsUsed} 次同动作记录`;
+
+  if (decision.phase === 'ready_to_increase') {
+    return `${evidenceText}：重量未变时次数稳定提升，最新全部工作组达到上限；平均、最低和最后一组 RIR 均达到加重条件。`;
+  }
+
+  if (decision.phase === 'confirmed_regression') {
+    return `${evidenceText}：已连续 3 次出现多组低于次数下限，并伴随 RIR 0-1 或工作组完成度下降，因此建议降低一个配重档位。`;
+  }
+
+  if (decision.phase === 'load_adaptation') {
+    return `${evidenceText}：最近一次重量已经提高，次数仍处于目标范围内，属于加重后的正常适应阶段。`;
+  }
+
+  if (decision.phase === 'rir_incomplete') {
+    return `${evidenceText}：重量和次数仍可用于判断，但最新 RIR 数据不完整，因此保守维持当前重量。`;
+  }
+
+  if (decision.phase === 'recovery_watch') {
+    return `${evidenceText}：近期表现连续下降，但尚未满足连续 3 次明显失败的降重门槛；先保持重量并注意恢复。`;
+  }
+
+  if (decision.phase === 'top_range_high_strain') {
+    return `${evidenceText}：次数已经达到上限，但最低或最后一组 RIR 显示接近力竭，暂不加重。`;
+  }
+
+  if (decision.phase === 'reps_progress') {
+    return `${evidenceText}：当前重量不变，总完成次数正在提高，属于次数进步；继续把各组推进到目标上限。`;
+  }
+
+  if (decision.phase === 'single_bad_session') {
+    return `${evidenceText}：最新一次表现明显下降，但单次状态不足以触发降重，先保持并观察下一次。`;
+  }
+
+  return `${evidenceText}：当前表现没有形成明确的连续加重或降重信号，优先维持并稳定完成目标。`;
 }
 
 export function calculateEstimatedOneRepMax({ weight, reps, rir }) {
@@ -644,6 +951,7 @@ export function recommendWeightForTarget({
   exercise,
   planExercise,
   lastExerciseLog,
+  recentExerciseLogs,
   userProfile,
   exerciseList = defaultExercises
 } = {}) {
@@ -651,60 +959,34 @@ export function recommendWeightForTarget({
   const fullExercise = exercise || exerciseMap.get(planExercise && planExercise.exerciseId) || null;
   const exerciseId = fullExercise ? fullExercise.id : planExercise && planExercise.exerciseId;
   const trackingType = fullExercise && fullExercise.trackingType ? fullExercise.trackingType : 'weight_reps';
+  const historyLogs = Array.isArray(recentExerciseLogs) && recentExerciseLogs.length > 0
+    ? recentExerciseLogs.slice(-3)
+    : lastExerciseLog
+      ? [lastExerciseLog]
+      : [];
+  const latestExerciseLog = historyLogs[historyLogs.length - 1] || null;
 
   if (trackingType === 'time_based') {
-    return buildTimeRecommendation({ exercise: fullExercise, planExercise, lastExerciseLog });
+    return buildTimeRecommendation({ exercise: fullExercise, planExercise, lastExerciseLog: latestExerciseLog });
   }
 
   const targetReps = parseTargetReps(planExercise && planExercise.target);
-  const targetRir = parseTargetRir(planExercise && planExercise.target);
-  const targetSetCount = getTargetSetCount(planExercise && planExercise.target);
-  const completedSets = getCompletedSets(lastExerciseLog);
-  const weightSet = getLatestCompletedWeightSet(lastExerciseLog);
+  const target = planExercise && planExercise.target ? planExercise.target : {};
+  const weightSet = getLatestCompletedWeightSet(latestExerciseLog);
 
   if (weightSet) {
-    const completedReps = completedSets
-      .map((set) => toNumberOrNull(set.reps))
-      .filter((reps) => reps !== null);
-    const completedRirs = completedSets
-      .map((set) => toNumberOrNull(set.rir))
-      .filter((rir) => rir !== null);
-    const upper = targetReps.max;
-    const lower = targetReps.min;
-    const completedAllWorkSets = targetSetCount > 0
-      ? completedSets.length >= targetSetCount
-      : completedSets.length > 0;
-    const allRirRecorded = targetRir === null || (
-      completedSets.length > 0 && completedRirs.length === completedSets.length
-    );
-    const allAtUpper = completedAllWorkSets &&
-      upper !== null &&
-      completedReps.length >= (targetSetCount || completedSets.length) &&
-      completedReps.every((reps) => reps >= upper);
-    const rirReady = targetRir === null || (
-      allRirRecorded && completedRirs.every((rir) => rir >= targetRir)
-    );
-    const belowLowerCount = lower === null ? 0 : completedReps.filter((reps) => reps < lower).length;
-    const nearFailureCount = completedRirs.filter((rir) => rir <= 1).length;
-    const majorityCount = Math.floor(completedSets.length / 2) + 1;
-    const averageRir = formatAverage(getAverage(completedRirs));
-    const averageWeight = getAverageCompletedWeight(lastExerciseLog) || toNumberOrNull(weightSet.weight);
+    const summaries = historyLogs.map((log) => summarizeExercisePerformance(log, target));
+    const trend = analyzeExerciseTrend(summaries, target);
+    const latest = trend.latest;
+    const decision = decideProgression(trend);
     const equipmentRule = getEquipmentRule(fullExercise);
     const weightStep = equipmentRule && equipmentRule.incrementKg ? equipmentRule.incrementKg : 2.5;
-    let strategy = '建议维持重量';
-    let suggestedWeight = averageWeight;
-
-    if (allAtUpper && rirReady) {
-      strategy = '建议加重量';
-      suggestedWeight = averageWeight + weightStep;
-    } else if (
-      completedAllWorkSets &&
-      belowLowerCount >= majorityCount &&
-      nearFailureCount >= majorityCount
-    ) {
-      strategy = '建议降低重量';
-      suggestedWeight = Math.max(weightStep, averageWeight - weightStep);
-    }
+    const baseWeight = latest.workingWeight ?? toNumberOrNull(weightSet.weight);
+    const suggestedWeight = decision.direction === 'increase'
+      ? baseWeight + weightStep
+      : decision.direction === 'decrease'
+        ? Math.max(weightStep, baseWeight - weightStep)
+        : baseWeight;
 
     const rounded = applyEquipmentWeightRule(suggestedWeight, fullExercise);
     const roundedWeight = rounded.suggestedWeight;
@@ -719,32 +1001,28 @@ export function recommendWeightForTarget({
       rawEstimatedWeightText: formatWeightText(rounded.rawEstimatedWeight, weightSet.weightUnit || 'kg'),
       roundingIncrementKg: rounded.roundingIncrementKg,
       roundingNote: rounded.roundingNote,
-      suggestedRepsText: buildSuggestedRepsText({
-        strategy,
-        completedReps,
-        targetReps,
-        targetRir,
-        averageRir,
-        targetSetCount,
-        completedAllWorkSets
-      }),
+      suggestedRepsText: buildNextRepTarget(latest, target, decision),
       suggestedDurationSeconds: null,
       suggestedDurationText: '',
       estimatedOneRepMax: calculateEstimatedOneRepMax(weightSet),
-      averageRir,
-      completedAllWorkSets,
-      completedSetCount: completedSets.length,
-      targetSetCount,
-      strategy,
-      reason: getWeightRecommendationReason({
-        strategy,
-        completedReps,
-        targetReps,
-        completedAllWorkSets,
-        allRirRecorded,
-        hasHistory: true,
-        hasBaseline: false
-      })
+      averageRir: latest.averageRir,
+      minimumRir: latest.minimumRir,
+      lastRir: latest.lastRir,
+      rirCoverage: latest.rirCoverage,
+      completedAllWorkSets: latest.completedAllWorkSets,
+      completedSetCount: latest.completedSetCount,
+      targetSetCount: latest.targetSetCount,
+      strategy: decision.strategy,
+      phase: decision.phase,
+      sessionsUsed: trend.sessionsUsed,
+      trend: {
+        failureStreak: trend.failureStreak,
+        declineTransitions: trend.declineTransitions,
+        loadIncreased: trend.loadIncreased,
+        weightProgress: trend.weightProgress,
+        repsProgress: trend.repsProgress
+      },
+      reason: buildTrendRecommendationReason({ decision, trend })
     };
   }
 

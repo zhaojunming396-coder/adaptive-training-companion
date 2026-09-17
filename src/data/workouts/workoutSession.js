@@ -188,6 +188,16 @@ function validateWorkoutSession(session, exerciseList = defaultExercises, {
       }
 
       if (
+        !allowIncompleteAnalysisData &&
+        exercise &&
+        ['weight_reps', 'reps_only'].includes(exercise.trackingType) &&
+        set.completed === true &&
+        (!('rir' in set) || set.rir === undefined || set.rir === null || set.rir === '')
+      ) {
+        errors.push({ exerciseId: log.exerciseId, setIndex: set.setIndex, field: 'rir' });
+      }
+
+      if (
         exercise &&
         exercise.trackingType === 'time_based' &&
         set.completed === true &&

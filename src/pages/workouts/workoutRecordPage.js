@@ -11,6 +11,7 @@ import { exercises } from '../../data/exercises/exercises.js';
 import { buildWorkoutProgressSummary } from '../../data/workouts/workoutAnalytics.js';
 import {
   getLastCompletedExerciseLog,
+  getRecentCompletedExerciseLogs,
   readUserTrainingProfile,
   recommendWeightForTarget
 } from '../../data/workouts/weightRecommendation.js';
@@ -469,10 +470,12 @@ function summarizeLastPerformance(exerciseId) {
 function renderExerciseGuidance(exerciseId, exercise, planExercise, history, userProfile) {
   const performance = summarizeLastPerformance(exerciseId);
   const lastExerciseLog = getLastCompletedExerciseLog(planExercise.exerciseId, history);
+  const recentExerciseLogs = getRecentCompletedExerciseLogs(planExercise.exerciseId, history, 3);
   const recommendation = recommendWeightForTarget({
     exercise,
     planExercise,
     lastExerciseLog,
+    recentExerciseLogs,
     userProfile
   });
   const wrapper = document.createElement('section');

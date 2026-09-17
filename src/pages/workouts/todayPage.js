@@ -10,6 +10,7 @@ import {
 } from '../../data/workouts/workoutAnalytics.js';
 import {
   getLastCompletedExerciseLog,
+  getRecentCompletedExerciseLogs,
   recommendWeightForTarget,
   readUserTrainingProfile
 } from '../../data/workouts/weightRecommendation.js';
@@ -373,17 +374,20 @@ function renderKeyExerciseFeedback(page, detail) {
   card.appendChild(title);
 
   const profile = readUserTrainingProfile();
+  const history = readWorkoutHistory();
   const list = document.createElement('div');
   list.className = 'feedback-list';
 
   detail.exercises.slice(0, 3).forEach((exercise) => {
-    const lastExerciseLog = getLastCompletedExerciseLog(exercise.exerciseId, readWorkoutHistory());
+    const lastExerciseLog = getLastCompletedExerciseLog(exercise.exerciseId, history);
+    const recentExerciseLogs = getRecentCompletedExerciseLogs(exercise.exerciseId, history, 3);
     const recommendation = recommendWeightForTarget({
       planExercise: {
         exerciseId: exercise.exerciseId,
         target: exercise.target
       },
       lastExerciseLog,
+      recentExerciseLogs,
       userProfile: profile
     });
     const lastPerformance = getLastExercisePerformance(exercise.exerciseId);

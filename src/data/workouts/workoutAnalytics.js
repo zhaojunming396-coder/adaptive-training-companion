@@ -131,42 +131,50 @@ function compareExerciseRecords(current, previous) {
     };
   }
 
+  if (
+    current.maxWeight !== null &&
+    previous.maxWeight !== null &&
+    current.maxWeight > previous.maxWeight
+  ) {
+    return {
+      status: '重量进步',
+      improved: true,
+      message: `最高重量提高 ${Number((current.maxWeight - previous.maxWeight).toFixed(1))}kg；次数变化与训练容量仅作辅助记录。`
+    };
+  }
+
   if (current.maxWeight === previous.maxWeight && current.totalReps > previous.totalReps) {
     return {
-      status: '进步',
+      status: '次数进步',
       improved: true,
       message: `同重量下比上次多完成 ${current.totalReps - previous.totalReps} 次。`
     };
   }
 
-  if (current.totalReps === previous.totalReps && current.maxWeight !== null && previous.maxWeight !== null && current.maxWeight > previous.maxWeight) {
+  if (current.maxWeight === previous.maxWeight && current.totalReps === previous.totalReps) {
     return {
-      status: '进步',
-      improved: true,
-      message: `同次数下重量提高 ${current.maxWeight - previous.maxWeight}kg。`
-    };
-  }
-
-  if (current.totalVolume > previous.totalVolume) {
-    return {
-      status: '进步',
-      improved: true,
-      message: `总容量增加 ${Math.round(current.totalVolume - previous.totalVolume)} kg·次。`
-    };
-  }
-
-  if (current.totalVolume === previous.totalVolume) {
-    return {
-      status: '持平',
+      status: '表现稳定',
       improved: false,
-      message: '总容量与上次持平。'
+      message: '重量和总完成次数与上次一致。'
+    };
+  }
+
+  if (
+    current.maxWeight !== null &&
+    previous.maxWeight !== null &&
+    current.maxWeight < previous.maxWeight
+  ) {
+    return {
+      status: '本次重量较低',
+      improved: false,
+      message: `最高重量比上次低 ${Number((previous.maxWeight - current.maxWeight).toFixed(1))}kg。`
     };
   }
 
   return {
-    status: '下降',
+    status: '本次次数较少',
     improved: false,
-    message: `总容量下降 ${Math.round(previous.totalVolume - current.totalVolume)} kg·次。`
+    message: `同重量下比上次少完成 ${Math.max(0, previous.totalReps - current.totalReps)} 次。`
   };
 }
 
@@ -323,19 +331,19 @@ export function buildWorkoutProgressSummary(currentSession, history, exerciseLis
     );
     const progress = currentRecord ? compareExerciseRecords(currentRecord, previousRecord) : null;
 
-    return {
+    return currentRecord ? {
       exerciseId: log.exerciseId,
       nameZh: getExerciseName(log.exerciseId, exerciseList),
       status: progress ? progress.status : '暂无数据',
       message: progress ? progress.message : '暂无可分析数据。'
-    };
-  });
+    } : null;
+  }).filter(Boolean);
 
   return {
     totalVolume: currentVolume,
     previousSameDayVolume: previousVolume,
     diff,
-    status: previousSameDay ? (diff > 0 ? '增加' : diff === 0 ? '持平' : '下降') : '暂无上次同训练日',
+    status: previousSameDay ? (diff > 0 ? '容量增加' : diff === 0 ? '容量持平' : '容量减少') : '暂无上次同训练日',
     exerciseSummaries
   };
 }

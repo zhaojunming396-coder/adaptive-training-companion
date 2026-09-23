@@ -8,7 +8,7 @@ import {
   updateWorkoutSet
 } from '../../data/workouts/workoutSession.js';
 import { exercises } from '../../data/exercises/exercises.js';
-import { buildWorkoutProgressSummary } from '../../data/workouts/workoutAnalytics.js';
+import { buildAdaptiveWorkoutSummary } from '../../data/workouts/workoutSummary.js';
 import {
   getLastCompletedExerciseLog,
   getRecentCompletedExerciseLogs,
@@ -657,24 +657,57 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
   stats.appendChild(grid);
   page.appendChild(stats);
 
-  const progressSummary = buildWorkoutProgressSummary(savedSession, readWorkoutHistory());
+  const progressSummary = buildAdaptiveWorkoutSummary({
+    currentSession: savedSession,
+    history: readWorkoutHistory(),
+    planExercises: detail.exercises,
+    exerciseList: exercises,
+    userProfile: readUserTrainingProfile()
+  });
   const progressCard = document.createElement('section');
   progressCard.className = 'exercise';
   const progressTitle = document.createElement('h2');
-  progressTitle.textContent = '本次进步提示';
+  progressTitle.textContent = '本次表现';
   progressCard.appendChild(progressTitle);
   progressCard.appendChild(renderStatGrid([
     ['本次总容量', `${progressSummary.totalVolume} kg·次`],
-    ['同训练日对比', progressSummary.status],
+    ['同日容量对比', progressSummary.status],
     ['容量变化', `${progressSummary.diff > 0 ? '+' : ''}${progressSummary.diff} kg·次`],
     ['对比基准', progressSummary.previousSameDayVolume ? `${progressSummary.previousSameDayVolume} kg·次` : '-']
   ]));
   progressSummary.exerciseSummaries.forEach((item) => {
     const line = document.createElement('p');
-    line.textContent = `${item.nameZh}：${item.message}${item.status === '下降' ? ' 建议下次注意恢复。' : item.status === '进步' ? ' 建议下次维持或小幅加重。' : ''}`;
+    line.textContent = `${item.nameZh} · ${item.status}：${item.message}`;
     progressCard.appendChild(line);
   });
   page.appendChild(progressCard);
+
+  if (progressSummary.recommendations.length > 0) {
+    const recommendationCard = document.createElement('section');
+    recommendationCard.className = 'exercise';
+    const recommendationTitle = document.createElement('h2');
+    recommendationTitle.textContent = '下次训练建议';
+    recommendationCard.appendChild(recommendationTitle);
+
+    const recommendationList = document.createElement('div');
+    recommendationList.className = 'feedback-list';
+    progressSummary.recommendations.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'feedback-row';
+      row.innerHTML = [
+        '<div class="feedback-row-head">',
+        `<strong>${item.nameZh}</strong>`,
+        `<span>${item.strategy}</span>`,
+        '</div>',
+        `<span>本次：${item.currentPerformanceText}</span>`,
+        `<span>下次：${item.recommendationText}</span>`,
+        `<p>原因：${item.reason}</p>`
+      ].join('');
+      recommendationList.appendChild(row);
+    });
+    recommendationCard.appendChild(recommendationList);
+    page.appendChild(recommendationCard);
+  }
 
   const actions = document.createElement('div');
   actions.className = 'actions';

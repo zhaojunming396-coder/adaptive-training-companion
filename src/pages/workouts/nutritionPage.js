@@ -114,7 +114,7 @@ export function renderNutritionPage(root, message = '') {
   page.className = 'page';
 
   const hero = document.createElement('section');
-  hero.className = 'hero-card';
+  hero.className = 'record-header page-heading';
   hero.innerHTML = [
     `<p class="eyebrow">${date}</p>`,
     '<h1>补剂 / 蛋白质</h1>',

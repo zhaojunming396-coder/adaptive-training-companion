@@ -48,7 +48,7 @@ export function renderBackupPage(root, message = null) {
   page.className = 'page';
 
   const hero = document.createElement('section');
-  hero.className = 'hero-card';
+  hero.className = 'record-header page-heading';
   hero.innerHTML = '<p class="eyebrow">本地 JSON</p><h1>数据备份</h1><p>导出和导入只处理本机训练数据，不会上传到服务器。</p>';
   page.appendChild(hero);
 

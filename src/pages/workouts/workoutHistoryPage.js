@@ -12,12 +12,18 @@ export function renderWorkoutHistoryPage(root) {
 
   const title = document.createElement('h1');
   title.textContent = '训练记录';
-  page.appendChild(title);
+  const header = document.createElement('header');
+  header.className = 'record-header page-heading';
+  header.appendChild(title);
+  page.appendChild(header);
 
   if (history.length === 0) {
-    const empty = document.createElement('p');
-    empty.textContent = '暂无训练记录。';
+    const empty = document.createElement('section');
+    empty.className = 'exercise';
+    empty.innerHTML = '<p>还没有训练记录，保存一次训练后就会显示在这里。</p><a class="support-link" href="#today">返回今日</a>';
     page.appendChild(empty);
+    root.appendChild(page);
+    return;
   }
 
   history.forEach((session) => {
@@ -51,6 +57,7 @@ export function renderWorkoutHistoryPage(root) {
   actions.className = 'actions';
 
   const todayButton = document.createElement('button');
+  todayButton.className = 'secondary-button';
   todayButton.textContent = '返回今日训练';
   todayButton.addEventListener('click', () => navigateTo('today'));
   actions.appendChild(todayButton);

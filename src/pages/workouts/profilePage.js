@@ -112,7 +112,7 @@ export function renderProfilePage(root) {
   page.className = 'page';
 
   const hero = document.createElement('section');
-  hero.className = 'hero-card';
+  hero.className = 'record-header page-heading';
   hero.innerHTML = '<p class="eyebrow">本地保存</p><h1>我的训练档案</h1><p>用于给训练记录页生成本次建议重量，不会自动填入训练记录。</p><p>建议重量仅供参考，请以动作稳定和 RIR 为准。</p>';
   page.appendChild(hero);
 

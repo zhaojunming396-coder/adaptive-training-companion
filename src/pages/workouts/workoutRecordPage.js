@@ -1,3 +1,4 @@
+import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
 import {
   buildWorkoutSummary,
   buildTrainingDayDetail,
@@ -497,8 +498,8 @@ function renderExerciseGuidance(exerciseId, exercise, planExercise, history, use
     : recommendation.suggestedWeightText;
   today.innerHTML = `<span class="guidance-label">今天建议</span>
     <strong>${suggestedValue || '自主选择'}</strong>
-    <span>${recommendation.suggestedRepsText ? `目标 ${recommendation.suggestedRepsText}` : recommendation.strategy}</span>
-    <span class="guidance-strategy">${recommendation.strategy}</span>`;
+    <span>${recommendation.suggestedRepsText ? `目标 ${recommendation.suggestedRepsText}` : ''}</span>
+    <span class="guidance-strategy">${recommendationLabel(recommendation)}</span>`;
   wrapper.appendChild(today);
 
   const reason = document.createElement('details');
@@ -507,7 +508,7 @@ function renderExerciseGuidance(exerciseId, exercise, planExercise, history, use
   summary.textContent = '为什么这样建议';
   reason.appendChild(summary);
   const explanation = document.createElement('p');
-  explanation.textContent = recommendation.reason;
+  explanation.textContent = recommendationReason(recommendation);
   reason.appendChild(explanation);
   wrapper.appendChild(reason);
 
@@ -697,11 +698,11 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
       row.innerHTML = [
         '<div class="feedback-row-head">',
         `<strong>${item.nameZh}</strong>`,
-        `<span>${item.strategy}</span>`,
+        `<span>${recommendationLabel(item)}</span>`,
         '</div>',
         `<span>本次：${item.currentPerformanceText}</span>`,
         `<span>下次：${item.recommendationText}</span>`,
-        `<p>原因：${item.reason}</p>`
+        `<p>原因：${recommendationReason(item)}</p>`
       ].join('');
       recommendationList.appendChild(row);
     });

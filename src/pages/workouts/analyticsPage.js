@@ -191,14 +191,14 @@ export function renderAnalyticsPage(root) {
   const page = document.createElement('section');
   page.className = 'page';
   const hero = document.createElement('section');
-  hero.className = 'hero-card';
+  hero.className = 'record-header page-heading';
   hero.innerHTML = '<p class="eyebrow">本地历史</p><h1>数据分析</h1><p>基于本机训练历史计算，不上传数据。</p>';
   page.appendChild(hero);
 
   if (!Array.isArray(history) || history.length === 0) {
     const empty = document.createElement('section');
     empty.className = 'exercise';
-    empty.textContent = '暂无训练数据，完成一次训练后再查看分析。';
+    empty.innerHTML = '<p>还没有训练数据，保存一次训练后即可查看分析。</p><a class="support-link" href="#today">返回今日</a>';
     page.appendChild(empty);
     root.appendChild(page);
     return;

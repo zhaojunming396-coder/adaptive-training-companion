@@ -648,6 +648,16 @@ function renderNutritionSummaryCard(page) {
   page.appendChild(card);
 }
 
+function createTodaySection(label, className, open) {
+  const section = document.createElement('details');
+  section.className = `today-secondary ${className}`;
+  section.open = open;
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  section.appendChild(summary);
+  return section;
+}
+
 export function renderTodayPage(root) {
   const todaySelection = getTodayTrainingSelection();
   const manualPlanDay = appState.selectedPlanDayId ? getManualPlanDay(appState.selectedPlanDayId) : null;
@@ -666,11 +676,15 @@ export function renderTodayPage(root) {
         }
       : todaySelection;
 
+  const settingsOpen = root.querySelector('.today-settings')?.open ?? false;
+  const feedbackOpen = root.querySelector('.today-feedback')?.open ?? false;
   root.innerHTML = '';
 
   const page = document.createElement('section');
   page.className = 'page';
   const history = readWorkoutHistory();
+  const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
+  const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
   if (selection.isRestDay) {
     const feedback = buildTrainingFeedback({ history, selection, detail: null });
@@ -697,7 +711,7 @@ export function renderTodayPage(root) {
     hero.appendChild(tip);
 
     page.appendChild(hero);
-    renderFeedbackPanel(page, feedback);
+    renderFeedbackPanel(supporting, feedback);
   } else {
     const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
     const feedback = buildTrainingFeedback({ history, selection, detail });
@@ -729,9 +743,9 @@ export function renderTodayPage(root) {
     hero.appendChild(startButton);
 
     page.appendChild(hero);
-    renderFeedbackPanel(page, feedback);
-    renderExercisePlanner(page, detail, root);
-    renderKeyExerciseFeedback(page, detail);
+    renderFeedbackPanel(supporting, feedback);
+    renderExercisePlanner(settings, detail, root);
+    renderKeyExerciseFeedback(supporting, detail);
 
     const detailLink = document.createElement('a');
     detailLink.className = 'support-link';
@@ -740,7 +754,8 @@ export function renderTodayPage(root) {
     hero.after(detailLink);
   }
 
-  renderNutritionSummaryCard(page);
-  renderManualSelector(page, root);
+  renderManualSelector(settings, root);
+  renderNutritionSummaryCard(supporting);
+  page.append(settings, supporting);
   root.appendChild(page);
 }

@@ -192,18 +192,20 @@ export function renderAnalyticsPage(root) {
   page.className = 'page';
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<p class="eyebrow">本地历史</p><h1>数据分析</h1><p>基于本机训练历史计算，不上传数据。</p>';
+  hero.innerHTML = '<h1>数据分析</h1>';
   page.appendChild(hero);
 
   if (!Array.isArray(history) || history.length === 0) {
     const empty = document.createElement('section');
-    empty.className = 'exercise';
+    empty.className = 'page-empty';
     empty.innerHTML = '<p>还没有训练数据，保存一次训练后即可查看分析。</p><a class="support-link" href="#today">返回今日</a>';
     page.appendChild(empty);
     root.appendChild(page);
     return;
   }
 
+  hero.insertAdjacentHTML('afterbegin', '<p class="eyebrow">本地历史</p>');
+  hero.insertAdjacentHTML('beforeend', '<p>基于本机训练历史计算，不上传数据。</p>');
   renderOverview(page, history);
   renderTrendCharts(page, history);
   renderExerciseAnalysis(page, history, selectedExerciseId);

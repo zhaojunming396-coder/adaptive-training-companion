@@ -19,7 +19,7 @@ export function renderWorkoutHistoryPage(root) {
 
   if (history.length === 0) {
     const empty = document.createElement('section');
-    empty.className = 'exercise';
+    empty.className = 'page-empty';
     empty.innerHTML = '<p>还没有训练记录，保存一次训练后就会显示在这里。</p><a class="support-link" href="#today">返回今日</a>';
     page.appendChild(empty);
     root.appendChild(page);

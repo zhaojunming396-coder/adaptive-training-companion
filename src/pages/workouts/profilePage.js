@@ -42,9 +42,27 @@ function renderBaselineList(profile, page) {
 
   const exerciseNameMap = new Map(exercises.map((exercise) => [exercise.id, exercise.nameZh]));
   const list = document.createElement('ul');
+  list.className = 'baseline-list';
   profile.baselineLifts.forEach((lift) => {
     const item = document.createElement('li');
-    item.textContent = `${exerciseNameMap.get(lift.exerciseId) || lift.exerciseId}：${lift.weight}${lift.weightUnit || 'kg'} × ${lift.reps || '-'}，RIR ${lift.rir ?? '-'}，来源 ${lift.sourceType || '-'}，可信度 ${lift.confidence || '-'}${lift.recommendedStartWeight ? `，建议起步 ${lift.recommendedStartWeight}${lift.weightUnit || 'kg'}` : ''}${lift.note ? `。${lift.note}` : ''}`;
+    const name = document.createElement('h3');
+    name.textContent = exerciseNameMap.get(lift.exerciseId) || lift.exerciseId;
+
+    const value = document.createElement('strong');
+    value.className = 'baseline-value';
+    const unit = lift.weightUnit || 'kg';
+    value.textContent = `${lift.weight} ${unit} × ${lift.reps || '-'} 次`;
+
+    const details = document.createElement('p');
+    details.className = 'baseline-meta';
+    details.textContent = [
+      `RIR ${lift.rir ?? '-'}`,
+      lift.sourceType && `来源：${lift.sourceType}`,
+      lift.confidence && `可信度：${lift.confidence}`,
+      lift.recommendedStartWeight && `建议起步 ${lift.recommendedStartWeight} ${unit}`,
+      lift.note
+    ].filter(Boolean).join(' · ');
+    item.append(name, value, details);
     list.appendChild(item);
   });
   card.appendChild(list);
@@ -113,7 +131,7 @@ export function renderProfilePage(root) {
 
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<p class="eyebrow">本地保存</p><h1>我的训练档案</h1><p>用于给训练记录页生成本次建议重量，不会自动填入训练记录。</p><p>建议重量仅供参考，请以动作稳定和 RIR 为准。</p>';
+  hero.innerHTML = '<p class="eyebrow">本地保存</p><h1>我的训练档案</h1>';
   page.appendChild(hero);
 
   const basic = document.createElement('section');

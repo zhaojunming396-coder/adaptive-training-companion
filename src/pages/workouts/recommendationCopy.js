@@ -13,5 +13,9 @@ export function recommendationLabel({ strategy }) {
 
 export function recommendationReason({ reason = '' }) {
   // Keep the reason supplied by the rules; present its first sentence in the UI.
-  return reason.split('。', 1)[0].replace(/^参考最近 \d+ 次同动作记录：/, '') || '完成训练记录后再生成建议';
+  const sentences = reason.split('。').map((sentence) => sentence.trim()).filter(Boolean);
+  const first = sentences[0]?.replace(/^参考最近 \d+ 次同动作记录：/, '');
+  const baseline = sentences.filter((sentence) => sentence.includes('参考基准力量'));
+  return [first, ...baseline].filter((sentence, index, all) => sentence && all.indexOf(sentence) === index).join('。')
+    || '完成训练记录后再生成建议';
 }

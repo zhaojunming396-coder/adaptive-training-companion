@@ -72,6 +72,26 @@
         background: var(--surface);
       }
 
+      .me-back {
+        display: none;
+        width: 100%;
+        max-width: 480px;
+        padding: 4px 16px 12px;
+        margin: auto;
+        color: var(--accent);
+        font-size: 14px;
+      }
+
+      body:has(#app[data-parent="me"]) .me-back {
+        display: block;
+      }
+
+      nav a[aria-current] {
+        color: #06120a;
+        background: var(--accent);
+        font-weight: 700;
+      }
+
       h1,
       h2,
       h3,
@@ -220,6 +240,97 @@
       .record-header h1,
       .record-header p {
         margin-bottom: 4px;
+      }
+
+      .today-secondary {
+        margin-bottom: 12px;
+      }
+
+      .today-secondary > summary {
+        padding: 10px 0;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .page-empty {
+        padding: 4px 0 12px;
+      }
+
+      .baseline-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .baseline-list li {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .baseline-list li:last-child {
+        border-bottom: 0;
+      }
+
+      .baseline-list h3,
+      .baseline-meta {
+        margin-bottom: 4px;
+      }
+
+      .baseline-list h3 {
+        color: var(--text);
+      }
+
+      .baseline-value {
+        display: block;
+        font-size: 20px;
+      }
+
+      .baseline-meta {
+        margin-top: 4px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .page-heading {
+        margin-bottom: 14px;
+      }
+
+      .primary-action {
+        width: 100%;
+      }
+
+      .support-link {
+        display: inline-block;
+        padding: 2px 0 14px;
+        color: var(--accent);
+        font-size: 14px;
+      }
+
+      .me-links {
+        list-style: none;
+        padding: 0;
+        margin: 14px 0 0;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--surface);
+      }
+
+      .me-links li + li {
+        border-top: 1px solid var(--line);
+      }
+
+      .me-links a {
+        display: block;
+        padding: 13px 16px;
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .me-links a::after {
+        content: '›';
+        float: right;
+        color: var(--muted);
       }
 
       .training-status-card {
@@ -967,16 +1078,13 @@
     </style>
   </head>
   <body>
-    <nav>
-      <a href="#today">今日训练</a>
-      <a href="#detail">训练详情</a>
+    <nav aria-label="训练导航">
+      <a href="#today">今日</a>
       <a href="#record">训练中</a>
       <a href="#history">历史</a>
-      <a href="#profile">档案</a>
-      <a href="#nutrition">补剂</a>
-      <a href="#backup">备份</a>
-      <a href="#analytics">分析</a>
+      <a href="#me">我的</a>
     </nav>
+    <a class="me-back" href="#me">← 返回我的</a>
     <main id="app"></main>
     <script type="module" src="./main.js"></script>
     <script>

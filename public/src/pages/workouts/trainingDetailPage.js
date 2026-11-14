@@ -97,7 +97,10 @@ export function renderTrainingDetailPage(root) {
 
   const title = document.createElement('h1');
   title.textContent = detail.isRestDay ? '今日休息' : detail.nameZh;
-  page.appendChild(title);
+  const header = document.createElement('header');
+  header.className = 'record-header page-heading';
+  header.appendChild(title);
+  page.appendChild(header);
 
   if (detail.isRestDay) {
     const hero = document.createElement('section');
@@ -108,7 +111,7 @@ export function renderTrainingDetailPage(root) {
     eyebrow.textContent = hasManualSelection() ? '手动选择' : '今日安排';
     hero.appendChild(eyebrow);
 
-    const titleRest = document.createElement('h1');
+    const titleRest = document.createElement('h2');
     titleRest.textContent = '今日休息 / 低强度有氧';
     hero.appendChild(titleRest);
 

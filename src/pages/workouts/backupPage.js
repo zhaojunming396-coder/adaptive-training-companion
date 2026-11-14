@@ -48,7 +48,7 @@ export function renderBackupPage(root, message = null) {
 
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<h1>数据备份</h1>';
+  hero.innerHTML = '<h1>数据备份</h1><p>导出和导入只处理这台设备上的数据，不会上传。</p>';
   page.appendChild(hero);
 
   if (message) {
@@ -61,7 +61,7 @@ export function renderBackupPage(root, message = null) {
   exportTitle.textContent = '导出备份';
   exportCard.appendChild(exportTitle);
   const exportDesc = document.createElement('p');
-  exportDesc.textContent = '导出内容包括训练档案、训练历史、手动选择训练日和休息震动开关。';
+  exportDesc.textContent = '备份包含训练档案、历史、补剂记录和设置。';
   exportCard.appendChild(exportDesc);
   const exportButton = document.createElement('button');
   exportButton.textContent = '导出 JSON 文件';
@@ -81,7 +81,7 @@ export function renderBackupPage(root, message = null) {
   importTitle.textContent = '导入备份';
   importCard.appendChild(importTitle);
   const importDesc = document.createElement('p');
-  importDesc.textContent = '导入会覆盖当前本地训练数据，请先确认文件来源可靠。';
+  importDesc.textContent = '导入会覆盖本机训练数据。';
   importCard.appendChild(importDesc);
 
   const fileInput = document.createElement('input');

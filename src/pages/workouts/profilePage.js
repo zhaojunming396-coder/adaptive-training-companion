@@ -25,10 +25,10 @@ function createNumberInput({ label, value, step = '1' }) {
 }
 
 const baselineSources = new Map([
-  ['user_reported_max', '自报最大重量'],
-  ['user_reported_working_set', '自报训练组'],
-  ['estimated_from_related_lift', '根据相关动作估算'],
-  ['technique_start_weight', '技术练习起步重量']
+  ['user_reported_max', '用户自报最大值'],
+  ['user_reported_working_set', '用户自报训练组'],
+  ['estimated_from_related_lift', '由相关动作估算'],
+  ['technique_start_weight', '技术起步重量']
 ]);
 const confidenceLabels = new Map([['high', '高'], ['medium', '中'], ['low', '低']]);
 
@@ -67,10 +67,15 @@ function renderBaselineList(profile, page) {
       `RIR ${lift.rir ?? '-'}`,
       lift.sourceType && `来源：${baselineSources.get(lift.sourceType) || '未注明'}`,
       lift.confidence && `可信度：${confidenceLabels.get(lift.confidence) || '未注明'}`,
-      lift.recommendedStartWeight && `建议起步 ${lift.recommendedStartWeight} ${unit}`,
-      lift.note
+      lift.recommendedStartWeight && `建议起步 ${lift.recommendedStartWeight} ${unit}`
     ].filter(Boolean).join(' · ');
     item.append(name, value, details);
+    if (lift.note) {
+      const note = document.createElement('p');
+      note.className = 'baseline-meta';
+      note.textContent = lift.note;
+      item.appendChild(note);
+    }
     list.appendChild(item);
   });
   card.appendChild(list);
@@ -104,6 +109,7 @@ function renderEquipmentRules(page, root) {
   card.appendChild(grid);
 
   const saveButton = document.createElement('button');
+  saveButton.className = 'secondary-button';
   saveButton.textContent = '保存配重档位';
   saveButton.addEventListener('click', () => {
     saveEquipmentWeightRules({
@@ -139,7 +145,7 @@ export function renderProfilePage(root) {
 
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<p class="eyebrow">本地保存</p><h1>我的训练档案</h1>';
+  hero.innerHTML = '<h1>我的训练档案</h1>';
   page.appendChild(hero);
 
   const basic = document.createElement('section');
@@ -173,6 +179,7 @@ export function renderProfilePage(root) {
   basic.appendChild(basicGrid);
 
   const saveBasic = document.createElement('button');
+  saveBasic.className = 'secondary-button';
   saveBasic.textContent = '保存基础资料';
   saveBasic.addEventListener('click', () => {
     saveUserTrainingProfile({
@@ -228,6 +235,7 @@ export function renderProfilePage(root) {
   baseline.appendChild(noteLabel);
 
   const saveBaseline = document.createElement('button');
+  saveBaseline.className = 'secondary-button';
   saveBaseline.textContent = '保存基准力量';
   saveBaseline.addEventListener('click', () => {
     const weight = toNumberOrNull(baselineWeight.input.value);

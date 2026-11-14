@@ -1,67 +1,220 @@
+import { exercises } from '../../data/exercises/exercises.js';
 import { bodyRecomposition4DayPlan } from '../../data/trainingPlans/bodyRecomposition4DayPlan.js';
-import { readWorkoutHistory } from '../../data/workouts/workoutSession.js';
-import { getPlanDayName, navigateTo } from './appState.js';
+import { buildWorkoutSummary, readWorkoutHistory } from '../../data/workouts/workoutSession.js';
+import {
+  getRecentCompletedExerciseLogs,
+  readUserTrainingProfile,
+  recommendWeightForTarget
+} from '../../data/workouts/weightRecommendation.js';
+import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
+
+const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+const planDayById = new Map(bodyRecomposition4DayPlan.planDays.map((day) => [day.planDayId, day]));
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function sessionName(session) {
+  return planDayById.get(session.planDayId)?.nameZh || '训练记录';
+}
+
+function sessionMeta(session) {
+  return [
+    session.date || '日期未记录',
+    session.completed ? '已完成' : '未完成',
+    `${session.durationMinutes || 0} 分钟`
+  ].join(' · ');
+}
+
+function timestamp(value) {
+  return typeof value === 'string' && value ? Date.parse(value) : NaN;
+}
+
+function sessionTime(session) {
+  return [session.endedAt, session.startedAt, session.date].map(timestamp).find(Number.isFinite) ?? 0;
+}
+
+function earlierHistory(history, session) {
+  const start = timestamp(session.startedAt);
+  return history.filter((candidate) => {
+    if (candidate.id === session.id) return false;
+    const end = timestamp(candidate.endedAt || candidate.startedAt);
+    if (Number.isFinite(start) && Number.isFinite(end)) return end < start;
+    // Date-only legacy records cannot establish an order within the same day.
+    return Boolean(candidate.date && session.date && candidate.date < session.date);
+  });
+}
+
+function present(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+}
+
+function recordedValues(set) {
+  if (set.completed !== true) return [];
+  const values = [];
+  if (present(set.weight)) values.push(`${set.weight} ${set.weightUnit || 'kg'}`);
+  if (present(set.reps)) values.push(`${set.reps} 次`);
+  if (present(set.durationSeconds)) values.push(`${set.durationSeconds} 秒`);
+  if (present(set.rir)) values.push(`RIR ${set.rir}`);
+  return values;
+}
+
+function formatPerformance(sets) {
+  const weighted = sets.filter((set) => present(set.weight) && present(set.reps));
+  if (weighted.length) {
+    const weights = new Set(weighted.map((set) => `${set.weight}${set.weightUnit || 'kg'}`));
+    return weights.size === 1
+      ? `${[...weights][0]} × ${weighted.map((set) => set.reps).join(' / ')}`
+      : weighted.map((set) => `${set.weight}${set.weightUnit || 'kg'} × ${set.reps}`).join(' · ');
+  }
+  const reps = sets.filter((set) => present(set.reps)).map((set) => set.reps);
+  if (reps.length) return `${reps.join(' / ')} 次`;
+  const durations = sets.filter((set) => present(set.durationSeconds)).map((set) => set.durationSeconds);
+  return durations.length ? `${durations.join(' / ')} 秒` : '已完成';
+}
+
+function appendNote(parent, note) {
+  if (typeof note !== 'string' || !note.trim()) return;
+  parent.appendChild(element('p', 'history-note', `备注：${note.trim()}`));
+}
+
+function renderExercise(log, planDay, history, profile) {
+  const exercise = exerciseById.get(log.exerciseId);
+  const name = exercise?.nameZh || (log.exerciseId === 'barbell_bench_press' ? '杠铃卧推' : '未知动作');
+  const sets = Array.isArray(log.sets) ? log.sets.filter(Boolean) : [];
+  const completed = sets.filter((set) => set.completed === true);
+  const card = element('section', 'exercise history-exercise');
+  const heading = element('div', 'feedback-row-head');
+  heading.appendChild(element('h2', '', name));
+  card.appendChild(heading);
+
+  const list = element('ul', 'history-sets');
+  sets.forEach((set, index) => {
+    const row = element('li', 'history-set');
+    row.appendChild(element('strong', '', `第 ${present(set.setIndex) ? set.setIndex : index + 1} 组`));
+    const values = recordedValues(set);
+    for (const value of values.length ? values : ['未记录']) row.appendChild(element('span', '', value));
+    list.appendChild(row);
+  });
+  if (sets.length) card.appendChild(list);
+  else card.appendChild(element('p', '', '未记录'));
+
+  if (completed.length) {
+    const planExercise = planDay?.exercises.find((item) => item.exerciseId === log.exerciseId)
+      || { exerciseId: log.exerciseId, target: {} };
+    const recentExerciseLogs = getRecentCompletedExerciseLogs(log.exerciseId, history, 3);
+    const recommendation = recommendWeightForTarget({
+      exercise,
+      planExercise,
+      recentExerciseLogs,
+      userProfile: profile
+    });
+    const label = recommendationLabel(recommendation);
+    if (label) heading.appendChild(element('span', '', label));
+
+    const advice = element('div', 'feedback-row history-advice');
+    const next = recommendation.type === 'time'
+      ? recommendation.suggestedDurationText
+      : [recommendation.suggestedWeightText, recommendation.suggestedRepsText].filter(Boolean).join(' · ');
+    advice.append(
+      element('span', '', `本次：${formatPerformance(completed)}`),
+      element('span', '', `下次：${next || '按计划目标继续'}`),
+      element('p', '', `原因：${recommendationReason(recommendation)}`)
+    );
+    card.appendChild(advice);
+  }
+
+  appendNote(card, log.notes);
+  return card;
+}
+
+function renderSession(page, session, history) {
+  const back = element('a', 'history-back', '← 返回历史');
+  back.href = '#history';
+  const header = element('header', 'record-header page-heading');
+  header.append(element('h1', '', sessionName(session)), element('p', '', sessionMeta(session)));
+  if (!session.completed) header.appendChild(element('p', '', '这次训练没有记完整。'));
+  page.append(back, header);
+
+  const logs = Array.isArray(session.exerciseLogs) ? session.exerciseLogs : [];
+  // Older logs can contain weighted movements that are no longer in the library.
+  const legacyWeighted = logs.filter((log) => !exerciseById.has(log.exerciseId)
+    && log.sets?.some((set) => set?.completed === true && present(set.weight) && present(set.reps)))
+    .map((log) => ({ id: log.exerciseId, trackingType: 'weight_reps' }));
+  const summary = buildWorkoutSummary(session, [...exercises, ...legacyWeighted]);
+  const stats = element('div', 'target-grid history-stats');
+  const items = [
+    ['完成组数', `${summary.completedSetCount} / ${summary.totalSetCount} 组`],
+    ['总容量', `${summary.totalVolume} kg·次`]
+  ];
+  if (summary.completedTimeSeconds > 0) items.push(['计时总时长', `${summary.completedTimeSeconds} 秒`]);
+  for (const [label, value] of items) {
+    const pill = element('div', 'target-pill');
+    pill.append(element('span', 'stat-label', label), element('strong', 'stat-value', value));
+    stats.appendChild(pill);
+  }
+  page.appendChild(stats);
+
+  if (summary.completedSetCount > 0) {
+    page.appendChild(element('p', 'history-disclaimer', '「下次」栏按当前规则与档案，使用这场训练开始前的记录重算建议。'));
+  }
+  const past = earlierHistory(history, session);
+  const profile = readUserTrainingProfile();
+  const planDay = planDayById.get(session.planDayId);
+  for (const log of logs) page.appendChild(renderExercise(log, planDay, past, profile));
+  appendNote(page, session.notes);
+}
 
 export function renderWorkoutHistoryPage(root) {
-  const history = readWorkoutHistory();
+  const history = readWorkoutHistory().slice().sort((a, b) => sessionTime(b) - sessionTime(a));
+  const prefix = '#history:';
+  const hash = window.location.hash;
+  const isReview = hash.startsWith(prefix);
+  let session;
+  if (isReview) {
+    try {
+      const id = decodeURIComponent(hash.slice(prefix.length));
+      session = history.find((item) => String(item.id) === id);
+    } catch {
+      // Invalid URL encoding is treated as a missing record.
+    }
+  }
 
-  root.innerHTML = '';
-
-  const page = document.createElement('section');
-  page.className = 'page';
-
-  const title = document.createElement('h1');
-  title.textContent = '训练记录';
-  const header = document.createElement('header');
-  header.className = 'record-header page-heading';
-  header.appendChild(title);
-  page.appendChild(header);
-
-  if (history.length === 0) {
-    const empty = document.createElement('section');
-    empty.className = 'page-empty';
-    empty.innerHTML = '<p>还没有训练记录，保存一次训练后就会显示在这里。</p><a class="support-link" href="#today">返回今日</a>';
-    page.appendChild(empty);
-    root.appendChild(page);
+  const page = element('section', 'page');
+  root.replaceChildren(page);
+  if (session) {
+    renderSession(page, session, history);
     return;
   }
 
-  history.forEach((session) => {
-    const item = document.createElement('article');
-    item.className = 'history-item';
+  const header = element('header', 'record-header page-heading');
+  header.appendChild(element('h1', '', '训练记录'));
+  page.appendChild(header);
+  if (isReview) {
+    const notice = element('p', 'notice', '没有找到这条训练记录。');
+    notice.setAttribute('role', 'status');
+    page.appendChild(notice);
+  }
 
-    const name = document.createElement('h3');
-    name.className = 'exercise-title';
-    name.textContent = getPlanDayName(bodyRecomposition4DayPlan, session.planDayId);
-    item.appendChild(name);
+  if (!history.length) {
+    const empty = element('section', 'page-empty');
+    const today = element('a', 'support-link', '返回今日');
+    today.href = '#today';
+    empty.append(element('p', '', '还没有训练记录，保存一次训练后就会显示在这里。'), today);
+    page.appendChild(empty);
+    return;
+  }
 
-    const stats = document.createElement('div');
-    stats.className = 'target-grid';
-    [
-      ['日期', session.date],
-      ['训练时长', `${session.durationMinutes || 0} 分钟`],
-      ['完成状态', session.completed ? '已完成' : '未完成'],
-      ['动作数量', `${Array.isArray(session.exerciseLogs) ? session.exerciseLogs.length : 0} 个`]
-    ].forEach(([label, value]) => {
-      const stat = document.createElement('div');
-      stat.className = 'target-pill';
-      stat.innerHTML = `<span class="stat-label">${label}</span><span class="stat-value">${value}</span>`;
-      stats.appendChild(stat);
-    });
-    item.appendChild(stats);
-
-    page.appendChild(item);
-  });
-
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-
-  const todayButton = document.createElement('button');
-  todayButton.className = 'secondary-button';
-  todayButton.textContent = '返回今日训练';
-  todayButton.addEventListener('click', () => navigateTo('today'));
-  actions.appendChild(todayButton);
-
-  page.appendChild(actions);
-  root.appendChild(page);
+  for (const item of history) {
+    const link = element('a', 'history-item history-link');
+    link.href = `#history:${encodeURIComponent(item.id)}`;
+    const copy = element('div', 'history-link-copy');
+    copy.append(element('strong', '', sessionName(item)), element('span', '', sessionMeta(item)));
+    link.appendChild(copy);
+    page.appendChild(link);
+  }
 }

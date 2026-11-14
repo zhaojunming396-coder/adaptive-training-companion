@@ -6,7 +6,6 @@ import {
   saveBackupBeforeImport,
   validateBackupPayload
 } from '../../data/workouts/localBackup.js';
-import { navigateTo } from './appState.js';
 
 function renderNotice(page, type, message) {
   const notice = document.createElement('div');
@@ -49,7 +48,7 @@ export function renderBackupPage(root, message = null) {
 
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<p class="eyebrow">本地 JSON</p><h1>数据备份</h1><p>导出和导入只处理本机训练数据，不会上传到服务器。</p>';
+  hero.innerHTML = '<h1>数据备份</h1><p>导出和导入只处理这台设备上的数据，不会上传。</p>';
   page.appendChild(hero);
 
   if (message) {
@@ -62,7 +61,7 @@ export function renderBackupPage(root, message = null) {
   exportTitle.textContent = '导出备份';
   exportCard.appendChild(exportTitle);
   const exportDesc = document.createElement('p');
-  exportDesc.textContent = '导出内容包括训练档案、训练历史、手动选择训练日和休息震动开关。';
+  exportDesc.textContent = '备份包含训练档案、历史、补剂记录和设置。';
   exportCard.appendChild(exportDesc);
   const exportButton = document.createElement('button');
   exportButton.textContent = '导出 JSON 文件';
@@ -82,11 +81,12 @@ export function renderBackupPage(root, message = null) {
   importTitle.textContent = '导入备份';
   importCard.appendChild(importTitle);
   const importDesc = document.createElement('p');
-  importDesc.textContent = '导入会覆盖当前本地训练数据，请先确认文件来源可靠。';
+  importDesc.textContent = '导入会覆盖本机训练数据。';
   importCard.appendChild(importDesc);
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
+  fileInput.hidden = true;
   fileInput.accept = 'application/json,.json';
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files && fileInput.files[0];
@@ -131,17 +131,12 @@ export function renderBackupPage(root, message = null) {
       renderBackupPage(root, { type: 'error', text: 'JSON 格式错误，请选择有效的备份文件。' });
     }
   });
-  importCard.appendChild(fileInput);
+  const importButton = document.createElement('button');
+  importButton.type = 'button';
+  importButton.textContent = '导入 JSON 文件';
+  importButton.addEventListener('click', () => fileInput.click());
+  importCard.append(importButton, fileInput);
   page.appendChild(importCard);
-
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  const todayButton = document.createElement('button');
-  todayButton.className = 'secondary-button';
-  todayButton.textContent = '返回今日训练';
-  todayButton.addEventListener('click', () => navigateTo('today'));
-  actions.appendChild(todayButton);
-  page.appendChild(actions);
 
   root.appendChild(page);
 }

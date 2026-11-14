@@ -6,7 +6,6 @@ import {
   saveDailyNutritionLog,
   saveDailySupplementLog
 } from '../../data/workouts/dailyNutrition.js';
-import { navigateTo } from './appState.js';
 
 function toNumber(value, fallback = 0) {
   const number = Number(value);
@@ -36,7 +35,6 @@ function createNumberField({ label, value, step = '1' }) {
   input.min = '0';
   input.step = step;
   input.value = value ?? '';
-  input.placeholder = label;
   wrapper.appendChild(input);
 
   return { wrapper, input };
@@ -61,7 +59,6 @@ function createNoteField({ label, value }) {
 
   const input = document.createElement('textarea');
   input.value = value || '';
-  input.placeholder = label;
   wrapper.appendChild(input);
 
   return { wrapper, input };
@@ -117,8 +114,7 @@ export function renderNutritionPage(root, message = '') {
   hero.className = 'record-header page-heading';
   hero.innerHTML = [
     `<p class="eyebrow">${date}</p>`,
-    '<h1>补剂 / 蛋白质</h1>',
-    '<p>轻量记录今日蛋白质目标和常用补剂。</p>'
+    '<h1>补剂 / 蛋白质</h1>'
   ].join('');
   page.appendChild(hero);
 
@@ -134,13 +130,6 @@ export function renderNutritionPage(root, message = '') {
   const proteinTitle = document.createElement('h2');
   proteinTitle.textContent = '今日蛋白质';
   proteinCard.appendChild(proteinTitle);
-  proteinCard.appendChild(renderStatGrid([
-    ['目标', `${progress.proteinTargetGram}g`],
-    ['已摄入', `${progress.proteinIntakeGram}g`],
-    ['还差', `${progress.remainingGram}g`],
-    ['完成度', `${progress.percent}%`]
-  ]));
-
   const proteinGrid = document.createElement('div');
   proteinGrid.className = 'set-row';
   const targetField = createNumberField({
@@ -154,6 +143,10 @@ export function renderNutritionPage(root, message = '') {
   proteinGrid.appendChild(targetField.wrapper);
   proteinGrid.appendChild(intakeField.wrapper);
   proteinCard.appendChild(proteinGrid);
+  proteinCard.appendChild(renderStatGrid([
+    ['还差', `${progress.remainingGram}g`],
+    ['完成度', `${progress.percent}%`]
+  ]));
 
   const nutritionNote = createNoteField({ label: '蛋白质备注', value: nutrition.notes });
   proteinCard.appendChild(nutritionNote.wrapper);
@@ -193,15 +186,6 @@ export function renderNutritionPage(root, message = '') {
   notice.className = 'meta-card';
   notice.textContent = '补剂记录仅用于个人训练辅助，不作为医疗或营养处方。如有疾病、用药或不适，请咨询专业人士。';
   page.appendChild(notice);
-
-  const backActions = document.createElement('div');
-  backActions.className = 'actions';
-  const todayButton = document.createElement('button');
-  todayButton.className = 'secondary-button';
-  todayButton.textContent = '返回今日训练';
-  todayButton.addEventListener('click', () => navigateTo('today'));
-  backActions.appendChild(todayButton);
-  page.appendChild(backActions);
 
   const actions = document.createElement('div');
   actions.className = 'sticky-actions';

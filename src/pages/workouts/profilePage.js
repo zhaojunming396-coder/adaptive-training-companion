@@ -24,6 +24,14 @@ function createNumberInput({ label, value, step = '1' }) {
   return { wrapper, input };
 }
 
+const baselineSources = new Map([
+  ['user_reported_max', '自报最大重量'],
+  ['user_reported_working_set', '自报训练组'],
+  ['estimated_from_related_lift', '根据相关动作估算'],
+  ['technique_start_weight', '技术练习起步重量']
+]);
+const confidenceLabels = new Map([['high', '高'], ['medium', '中'], ['low', '低']]);
+
 function renderBaselineList(profile, page) {
   const card = document.createElement('section');
   card.className = 'exercise';
@@ -46,7 +54,7 @@ function renderBaselineList(profile, page) {
   profile.baselineLifts.forEach((lift) => {
     const item = document.createElement('li');
     const name = document.createElement('h3');
-    name.textContent = exerciseNameMap.get(lift.exerciseId) || lift.exerciseId;
+    name.textContent = exerciseNameMap.get(lift.exerciseId) || (lift.exerciseId === 'barbell_bench_press' ? '杠铃卧推' : '未知动作');
 
     const value = document.createElement('strong');
     value.className = 'baseline-value';
@@ -57,8 +65,8 @@ function renderBaselineList(profile, page) {
     details.className = 'baseline-meta';
     details.textContent = [
       `RIR ${lift.rir ?? '-'}`,
-      lift.sourceType && `来源：${lift.sourceType}`,
-      lift.confidence && `可信度：${lift.confidence}`,
+      lift.sourceType && `来源：${baselineSources.get(lift.sourceType) || '未注明'}`,
+      lift.confidence && `可信度：${confidenceLabels.get(lift.confidence) || '未注明'}`,
       lift.recommendedStartWeight && `建议起步 ${lift.recommendedStartWeight} ${unit}`,
       lift.note
     ].filter(Boolean).join(' · ');
@@ -248,11 +256,6 @@ export function renderProfilePage(root) {
 
   const actions = document.createElement('div');
   actions.className = 'actions';
-  const todayButton = document.createElement('button');
-  todayButton.className = 'secondary-button';
-  todayButton.textContent = '返回今日训练';
-  todayButton.addEventListener('click', () => navigateTo('today'));
-  actions.appendChild(todayButton);
   const backupButton = document.createElement('button');
   backupButton.className = 'secondary-button';
   backupButton.textContent = '数据备份';

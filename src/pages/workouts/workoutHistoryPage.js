@@ -63,18 +63,11 @@ function recordedValues(set) {
   return values;
 }
 
-function formatPerformance(sets) {
-  const weighted = sets.filter((set) => present(set.weight) && present(set.reps));
-  if (weighted.length) {
-    const weights = new Set(weighted.map((set) => `${set.weight}${set.weightUnit || 'kg'}`));
-    return weights.size === 1
-      ? `${[...weights][0]} × ${weighted.map((set) => set.reps).join(' / ')}`
-      : weighted.map((set) => `${set.weight}${set.weightUnit || 'kg'} × ${set.reps}`).join(' · ');
-  }
-  const reps = sets.filter((set) => present(set.reps)).map((set) => set.reps);
-  if (reps.length) return `${reps.join(' / ')} 次`;
-  const durations = sets.filter((set) => present(set.durationSeconds)).map((set) => set.durationSeconds);
-  return durations.length ? `${durations.join(' / ')} 秒` : '已完成';
+function recommendationTone(strategy) {
+  if (strategy === '建议加重量' || strategy === '建议增加时长') return 'progress';
+  if (strategy === '建议降低重量') return 'reduce';
+  if (strategy === '暂无建议') return 'baseline';
+  return 'maintain';
 }
 
 function appendNote(parent, note) {
@@ -116,13 +109,14 @@ function renderExercise(log, planDay, history, profile) {
     const label = recommendationLabel(recommendation);
     if (label) heading.appendChild(element('span', '', label));
 
-    const advice = element('div', 'feedback-row history-advice');
-    const next = recommendation.type === 'time'
-      ? recommendation.suggestedDurationText
-      : [recommendation.suggestedWeightText, recommendation.suggestedRepsText].filter(Boolean).join(' · ');
+    const tone = recommendationTone(recommendation.strategy);
+    const advice = element('div', `feedback-row feedback-row-${tone} history-advice`);
+    const values = recommendation.type === 'time'
+      ? [recommendation.suggestedDurationText]
+      : [recommendation.suggestedWeightText, recommendation.suggestedRepsText];
+    const suggestion = values.filter((value) => value && value !== '暂无建议').join(' · ');
     advice.append(
-      element('span', '', `本次：${formatPerformance(completed)}`),
-      element('span', '', `下次：${next || '按计划目标继续'}`),
+      element('span', '', `本次建议：${suggestion || '按计划目标继续'}`),
       element('p', '', `原因：${recommendationReason(recommendation)}`)
     );
     card.appendChild(advice);
@@ -160,7 +154,7 @@ function renderSession(page, session, history) {
   page.appendChild(stats);
 
   if (summary.completedSetCount > 0) {
-    page.appendChild(element('p', 'history-disclaimer', '「下次」栏按当前规则与档案，使用这场训练开始前的记录重算建议。'));
+    page.appendChild(element('p', 'history-disclaimer', '建议按当前规则和档案，使用该场开始前的记录重算。'));
   }
   const past = earlierHistory(history, session);
   const profile = readUserTrainingProfile();

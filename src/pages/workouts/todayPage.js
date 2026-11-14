@@ -1,3 +1,4 @@
+import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
 import {
   getLastExercisePerformance,
   getTodayTrainingSelection,
@@ -391,20 +392,18 @@ function renderKeyExerciseFeedback(page, detail) {
       userProfile: profile
     });
     const lastPerformance = getLastExercisePerformance(exercise.exerciseId);
-    const strategyText = recommendation.strategy === '暂无建议'
-      ? '建立基准'
-      : recommendation.strategy;
+    const strategyText = recommendationLabel(recommendation);
     const row = document.createElement('div');
     row.className = `feedback-row feedback-row-${getRecommendationTone(recommendation.strategy)}`;
     row.innerHTML = [
       `<div class="feedback-row-head">`,
       `<strong>${exercise.detail ? exercise.detail.nameZh : exercise.exerciseId}</strong>`,
-      `<span>${strategyText}</span>`,
+      strategyText ? `<span>${strategyText}</span>` : '',
       `</div>`,
       `<span>计划目标：${formatTargetText(exercise.target)}</span>`,
       `<span>上次表现：${formatLastPerformance(lastPerformance)}</span>`,
       `<span>本次建议：${getRecommendationValueText(recommendation, exercise)}</span>`,
-      `<p>原因：${recommendation.reason}</p>`,
+      `<p>原因：${recommendationReason(recommendation)}</p>`,
       `<small>下次更新：${getNextUpdateText(recommendation, exercise)}</small>`
     ].join('');
     list.appendChild(row);
@@ -649,6 +648,16 @@ function renderNutritionSummaryCard(page) {
   page.appendChild(card);
 }
 
+function createTodaySection(label, className, open) {
+  const section = document.createElement('details');
+  section.className = `today-secondary ${className}`;
+  section.open = open;
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  section.appendChild(summary);
+  return section;
+}
+
 export function renderTodayPage(root) {
   const todaySelection = getTodayTrainingSelection();
   const manualPlanDay = appState.selectedPlanDayId ? getManualPlanDay(appState.selectedPlanDayId) : null;
@@ -667,11 +676,15 @@ export function renderTodayPage(root) {
         }
       : todaySelection;
 
+  const settingsOpen = root.querySelector('.today-settings')?.open ?? false;
+  const feedbackOpen = root.querySelector('.today-feedback')?.open ?? false;
   root.innerHTML = '';
 
   const page = document.createElement('section');
   page.className = 'page';
   const history = readWorkoutHistory();
+  const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
+  const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
   if (selection.isRestDay) {
     const feedback = buildTrainingFeedback({ history, selection, detail: null });
@@ -698,7 +711,7 @@ export function renderTodayPage(root) {
     hero.appendChild(tip);
 
     page.appendChild(hero);
-    renderFeedbackPanel(page, feedback);
+    renderFeedbackPanel(supporting, feedback);
   } else {
     const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
     const feedback = buildTrainingFeedback({ history, selection, detail });
@@ -715,19 +728,13 @@ export function renderTodayPage(root) {
     name.textContent = detail.nameZh;
     hero.appendChild(name);
 
-    hero.appendChild(renderStatGrid([
-      ['预计时长', `${detail.estimatedDurationMinutes} 分钟`],
-      ['训练重点', focusText[selection.planDay.focus] || detail.notes || '-'],
-      ['今日反馈', feedback.label],
-      ['本周完成', `${feedback.overview.weeklyTrainingCount}/${getPlannedTrainingCount()} 次`]
-    ]));
-
-    const warmup = document.createElement('div');
-    warmup.className = 'meta-card';
-    warmup.innerHTML = `<strong>热身内容</strong><p>${(detail.warmup.items || []).slice(0, 3).join('；')}</p>`;
-    hero.appendChild(warmup);
+    const meta = document.createElement('p');
+    meta.className = 'today-meta';
+    meta.textContent = `今日计划 · ${detail.estimatedDurationMinutes} 分钟 · ${focusText[selection.planDay.focus] || feedback.label}`;
+    hero.appendChild(meta);
 
     const startButton = document.createElement('button');
+    startButton.className = 'primary-action';
     startButton.textContent = '开始训练';
     startButton.addEventListener('click', () => {
       appState.activeSession = null;
@@ -736,52 +743,19 @@ export function renderTodayPage(root) {
     hero.appendChild(startButton);
 
     page.appendChild(hero);
-    renderFeedbackPanel(page, feedback);
-    renderExercisePlanner(page, detail, root);
-    renderKeyExerciseFeedback(page, detail);
+    renderFeedbackPanel(supporting, feedback);
+    renderExercisePlanner(settings, detail, root);
+    renderKeyExerciseFeedback(supporting, detail);
 
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-
-    const detailButton = document.createElement('button');
-    detailButton.className = 'secondary-button';
-    detailButton.textContent = '查看训练详情';
-    detailButton.addEventListener('click', () => navigateTo('detail'));
-    actions.appendChild(detailButton);
-
-    const historyButton = document.createElement('button');
-    historyButton.className = 'secondary-button';
-    historyButton.textContent = '查看训练记录';
-    historyButton.addEventListener('click', () => navigateTo('history'));
-    actions.appendChild(historyButton);
-
-    const profileButton = document.createElement('button');
-    profileButton.className = 'secondary-button';
-    profileButton.textContent = '我的训练档案';
-    profileButton.addEventListener('click', () => navigateTo('profile'));
-    actions.appendChild(profileButton);
-
-    page.appendChild(actions);
+    const detailLink = document.createElement('a');
+    detailLink.className = 'support-link';
+    detailLink.href = '#detail';
+    detailLink.textContent = '查看训练详情 →';
+    hero.after(detailLink);
   }
 
-  if (selection.isRestDay) {
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-
-    const historyButton = document.createElement('button');
-    historyButton.textContent = '查看训练记录';
-    historyButton.addEventListener('click', () => navigateTo('history'));
-    actions.appendChild(historyButton);
-
-    const profileButton = document.createElement('button');
-    profileButton.className = 'secondary-button';
-    profileButton.textContent = '我的训练档案';
-    profileButton.addEventListener('click', () => navigateTo('profile'));
-    actions.appendChild(profileButton);
-    page.appendChild(actions);
-  }
-
-  renderNutritionSummaryCard(page);
-  renderManualSelector(page, root);
+  renderManualSelector(settings, root);
+  renderNutritionSummaryCard(supporting);
+  page.append(settings, supporting);
   root.appendChild(page);
 }

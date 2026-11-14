@@ -177,8 +177,8 @@ function buildTrainingFeedback({ history, selection, detail }) {
   if (!previousSameDay) {
     return {
       status: 'baseline',
-      label: '建立基准',
-      headline: '今天先建立这个训练日的第一组数据。',
+      label: '首次记录',
+      headline: '今天先留下这个训练日的第一组数据。',
       advice: '先按建议重量保守完成目标次数，记录重量、次数和 RIR。下次系统才能判断该加重量、加次数还是保持。',
       evidence: lastSession
         ? `最近一次训练：${lastSession.date}，容量 ${formatVolume(getSessionVolume(lastSession))}。`
@@ -323,7 +323,7 @@ function getRecommendationTone(strategy) {
     return 'reduce';
   }
 
-  if (strategy === '参考基准力量' || strategy === '暂无建议') {
+  if (strategy === '暂无建议') {
     return 'baseline';
   }
 
@@ -347,8 +347,12 @@ function getNextUpdateText(recommendation, exercise) {
     return `${exerciseName} 这次优先稳定呼吸和节奏；如果完成轻松，下次再增加一小段时长。`;
   }
 
-  if (recommendation.strategy === '参考基准力量' || recommendation.strategy === '暂无建议') {
-    return `${exerciseName} 今天的数据会成为基准。请记录重量、次数和 RIR，下次系统会开始给出更准确的更新建议。`;
+  if (recommendation.strategy === '暂无建议') {
+    return `${exerciseName} 今天的数据会成为基准。请记录重量、次数和 RIR，下次会开始给出更准确的建议。`;
+  }
+
+  if (recommendation.strategy === '参考基准力量') {
+    return `${exerciseName} 先按你档案里的基准力量保守起步。请记录重量、次数和 RIR，有了这组记录后，下次会按实际表现更新建议。`;
   }
 
   return `${exerciseName} 本次先保持强度，争取多做 1-2 次或让 RIR 更接近目标；达标后下次再推进。`;
@@ -361,9 +365,17 @@ function getRecommendationValueText(recommendation, exercise) {
       : `目标：${formatTargetText(exercise.target)}`;
   }
 
-  return recommendation.suggestedWeightText && recommendation.suggestedWeightText !== '暂无建议'
-    ? `建议重量：${recommendation.suggestedWeightText}`
-    : `先按计划目标建立基准：${formatTargetText(exercise.target)}`;
+  if (recommendation.suggestedWeightText && recommendation.suggestedWeightText !== '暂无建议') {
+    return `建议重量：${recommendation.suggestedWeightText}`;
+  }
+
+  if (recommendation.strategy === '参考基准力量') {
+    return '先按档案基准力量保守起步';
+  }
+
+  return recommendation.strategy === '暂无建议'
+    ? `先按计划目标建立基准：${formatTargetText(exercise.target)}`
+    : `目标：${formatTargetText(exercise.target)}`;
 }
 
 function renderKeyExerciseFeedback(page, detail) {
@@ -748,10 +760,10 @@ export function renderTodayPage(root) {
     renderKeyExerciseFeedback(supporting, detail);
 
     const detailLink = document.createElement('a');
-    detailLink.className = 'support-link';
+    detailLink.className = 'support-link today-detail-link';
     detailLink.href = '#detail';
     detailLink.textContent = '查看训练详情 →';
-    hero.after(detailLink);
+    hero.appendChild(detailLink);
   }
 
   renderManualSelector(settings, root);

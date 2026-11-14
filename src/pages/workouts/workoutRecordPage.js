@@ -496,10 +496,11 @@ function renderExerciseGuidance(exerciseId, exercise, planExercise, history, use
   const suggestedValue = recommendation.type === 'time'
     ? recommendation.suggestedDurationText
     : recommendation.suggestedWeightText;
+  const strategyText = recommendationLabel(recommendation);
   today.innerHTML = `<span class="guidance-label">今天建议</span>
     <strong>${suggestedValue || '自主选择'}</strong>
     <span>${recommendation.suggestedRepsText ? `目标 ${recommendation.suggestedRepsText}` : ''}</span>
-    <span class="guidance-strategy">${recommendationLabel(recommendation)}</span>`;
+    ${strategyText ? `<span class="guidance-strategy">${strategyText}</span>` : ''}`;
   wrapper.appendChild(today);
 
   const reason = document.createElement('details');
@@ -693,12 +694,13 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
     const recommendationList = document.createElement('div');
     recommendationList.className = 'feedback-list';
     progressSummary.recommendations.forEach((item) => {
+      const strategyText = recommendationLabel(item);
       const row = document.createElement('div');
       row.className = 'feedback-row';
       row.innerHTML = [
         '<div class="feedback-row-head">',
         `<strong>${item.nameZh}</strong>`,
-        `<span>${recommendationLabel(item)}</span>`,
+        strategyText ? `<span>${strategyText}</span>` : '',
         '</div>',
         `<span>本次：${item.currentPerformanceText}</span>`,
         `<span>下次：${item.recommendationText}</span>`,

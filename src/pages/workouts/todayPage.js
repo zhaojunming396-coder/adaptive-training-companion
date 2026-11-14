@@ -398,7 +398,7 @@ function renderKeyExerciseFeedback(page, detail) {
     row.innerHTML = [
       `<div class="feedback-row-head">`,
       `<strong>${exercise.detail ? exercise.detail.nameZh : exercise.exerciseId}</strong>`,
-      `<span>${strategyText}</span>`,
+      strategyText ? `<span>${strategyText}</span>` : '',
       `</div>`,
       `<span>计划目标：${formatTargetText(exercise.target)}</span>`,
       `<span>上次表现：${formatLastPerformance(lastPerformance)}</span>`,

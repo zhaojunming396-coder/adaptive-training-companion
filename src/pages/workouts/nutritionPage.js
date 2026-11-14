@@ -133,11 +133,11 @@ export function renderNutritionPage(root, message = '') {
   const proteinGrid = document.createElement('div');
   proteinGrid.className = 'set-row';
   const targetField = createNumberField({
-    label: '今日蛋白质目标（g）',
+    label: '目标（g）',
     value: nutrition.proteinTargetGram
   });
   const intakeField = createNumberField({
-    label: '今日已摄入蛋白质（g）',
+    label: '已摄入（g）',
     value: nutrition.proteinIntakeGram
   });
   proteinGrid.appendChild(targetField.wrapper);

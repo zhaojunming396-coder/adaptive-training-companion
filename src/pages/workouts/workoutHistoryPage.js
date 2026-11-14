@@ -6,6 +6,8 @@ import {
   readUserTrainingProfile,
   recommendWeightForTarget
 } from '../../data/workouts/weightRecommendation.js';
+import { navigateTo } from './appState.js';
+import { migrateStoredDraftToHistory } from './workoutDraft.js';
 import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
 
 const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
@@ -41,7 +43,7 @@ function sessionTime(session) {
 function earlierHistory(history, session) {
   const start = timestamp(session.startedAt);
   return history.filter((candidate) => {
-    if (candidate.id === session.id) return false;
+    if (candidate.completed === false || candidate.id === session.id) return false;
     const end = timestamp(candidate.endedAt || candidate.startedAt);
     if (Number.isFinite(start) && Number.isFinite(end)) return end < start;
     // Date-only legacy records cannot establish an order within the same day.
@@ -153,6 +155,12 @@ function renderSession(page, session, history) {
   }
   page.appendChild(stats);
 
+  if (session.completed === false) {
+    const resume = element('button', 'primary-action', '继续训练');
+    resume.addEventListener('click', () => navigateTo(`record:${encodeURIComponent(session.id)}`));
+    page.appendChild(resume);
+  }
+
   if (summary.completedSetCount > 0) {
     page.appendChild(element('p', 'history-disclaimer', '建议按当前规则和档案，使用该场开始前的记录重算。'));
   }
@@ -164,6 +172,7 @@ function renderSession(page, session, history) {
 }
 
 export function renderWorkoutHistoryPage(root) {
+  migrateStoredDraftToHistory();
   const history = readWorkoutHistory().slice().sort((a, b) => sessionTime(b) - sessionTime(a));
   const prefix = '#history:';
   const hash = window.location.hash;

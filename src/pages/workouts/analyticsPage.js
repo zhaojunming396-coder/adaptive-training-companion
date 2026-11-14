@@ -1,5 +1,5 @@
 import { exercises } from '../../data/exercises/exercises.js';
-import { readWorkoutHistory } from '../../data/workouts/workoutSession.js';
+import { readCompletedWorkoutHistory } from './workoutDraft.js';
 import {
   buildExerciseAnalysis,
   buildPrRecords,
@@ -181,7 +181,7 @@ function renderPrRecords(page, history) {
 }
 
 export function renderAnalyticsPage(root) {
-  const history = readWorkoutHistory();
+  const history = readCompletedWorkoutHistory();
   const selectedExerciseId = window.location.hash.includes(':')
     ? window.location.hash.split(':')[1]
     : '';

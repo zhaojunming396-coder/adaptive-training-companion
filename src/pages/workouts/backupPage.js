@@ -48,7 +48,7 @@ export function renderBackupPage(root, message = null) {
 
   const hero = document.createElement('section');
   hero.className = 'record-header page-heading';
-  hero.innerHTML = '<h1>数据备份</h1><p>导出和导入只处理这台设备上的数据，不会上传。</p>';
+  hero.innerHTML = '<h1>数据备份</h1><p>数据只在本机，不会上传。</p><p>清缓存会丢失，请先导出备份。</p>';
   page.appendChild(hero);
 
   if (message) {

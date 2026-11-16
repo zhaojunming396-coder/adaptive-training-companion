@@ -269,7 +269,14 @@ export function renderProfilePage(root) {
   backupButton.textContent = '数据备份';
   backupButton.addEventListener('click', () => navigateTo('backup'));
   actions.appendChild(backupButton);
+  backupButton.setAttribute('aria-describedby', 'profile-backup-notice');
   page.appendChild(actions);
+
+  const backupNotice = document.createElement('p');
+  backupNotice.id = 'profile-backup-notice';
+  backupNotice.className = 'muted';
+  backupNotice.textContent = '数据只在本机，清缓存会丢。';
+  page.appendChild(backupNotice);
 
   root.appendChild(page);
 }

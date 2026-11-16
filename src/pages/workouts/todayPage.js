@@ -1,5 +1,6 @@
 import {
   alignWorkoutDraft,
+  getOtherUnfinishedWorkout,
   getUnfinishedWorkout,
   hasRecordedSets,
   readCompletedWorkoutHistory
@@ -754,9 +755,27 @@ export function renderTodayPage(root) {
 
     const startButton = document.createElement('button');
     startButton.className = 'primary-action';
-    startButton.textContent = getUnfinishedWorkout(detail.planDayId) ? '继续训练' : '开始训练';
-    startButton.addEventListener('click', () => navigateTo('record'));
+    const currentWorkout = getUnfinishedWorkout(detail.planDayId);
+    const otherWorkout = currentWorkout ? null : getOtherUnfinishedWorkout(detail.planDayId);
+    startButton.textContent = currentWorkout ? '继续训练' : '开始训练';
+    startButton.addEventListener('click', () => {
+      if (!otherWorkout) navigateTo('record');
+    });
     hero.appendChild(startButton);
+
+    if (otherWorkout) {
+      const notice = document.createElement('p');
+      notice.className = 'today-resume-notice';
+      notice.textContent = '还有一场未完成的训练，先继续那场。';
+      const resume = document.createElement('button');
+      resume.className = 'secondary-button';
+      resume.textContent = '继续那场训练';
+      resume.addEventListener('click', () => {
+        navigateTo(`record:${encodeURIComponent(otherWorkout.id)}`);
+        window.history.replaceState({ recordSource: 'today' }, '');
+      });
+      hero.append(notice, resume);
+    }
 
     page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);

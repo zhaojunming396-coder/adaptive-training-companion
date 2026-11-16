@@ -58,6 +58,17 @@ export function getUnfinishedWorkout(planDayId, draft = readWorkoutDraft(), hist
     .sort((a, b) => Date.parse(b.startedAt || b.date) - Date.parse(a.startedAt || a.date))[0] || null;
 }
 
+export function hasUnsavedWorkout(draft, history) {
+  return draft && !history.some((item) => item.id === draft.id && item.completed === true) &&
+    (draft.exerciseLogs.some(hasRecordedSets) || draft.notes?.trim() ||
+      draft.exerciseLogs.some((log) => log.notes?.trim()));
+}
+
+export function getOtherUnfinishedWorkout(planDayId, draft = readWorkoutDraft(), history = readWorkoutHistory()) {
+  if (draft?.planDayId !== planDayId && hasUnsavedWorkout(draft, history)) return draft;
+  return history.find((item) => item.planDayId !== planDayId && item.completed === false) || null;
+}
+
 export function alignWorkoutDraft(session, exerciseIds) {
   const existingLogs = new Map(session.exerciseLogs.map((log) => [log.exerciseId, log]));
   const fresh = createWorkoutSession({
@@ -95,9 +106,10 @@ export function getRecordEntry(hash, draft, history, planDayId) {
       return { redirect: 'history' };
     }
     const saved = history.find((item) => String(item.id) === id);
-    if (!saved) return { redirect: 'history' };
-    if (saved.completed !== false) return { redirect: `history:${encodeURIComponent(id)}` };
-    return { session: String(draft?.id) === id ? draft : saved, fromHistory };
+    const matchingDraft = String(draft?.id) === id ? draft : null;
+    if (!saved && !matchingDraft) return { redirect: 'history' };
+    if (saved && saved.completed !== false) return { redirect: `history:${encodeURIComponent(id)}` };
+    return { session: matchingDraft || saved, fromHistory };
   }
 
   return { session: getUnfinishedWorkout(planDayId, draft, history), fromHistory };

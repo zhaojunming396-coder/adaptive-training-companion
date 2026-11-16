@@ -1,7 +1,8 @@
 import {
   clearWorkoutDraft,
   getRecordEntry,
-  hasRecordedSets,
+  getOtherUnfinishedWorkout,
+  hasUnsavedWorkout,
   readCompletedWorkoutHistory,
   readWorkoutDraft,
   saveWorkoutDraft
@@ -917,7 +918,7 @@ function renderSession(root, session, detail, messages = []) {
 
   const backButton = document.createElement('button');
   backButton.className = 'secondary-button';
-  const fromHistory = window.location.hash.startsWith('#record:');
+  const fromHistory = window.location.hash.startsWith('#record:') && window.history.state?.recordSource !== 'today';
   backButton.textContent = fromHistory ? '返回历史' : '返回详情';
   backButton.addEventListener('click', () => navigateTo(fromHistory ? 'history' : 'detail'));
   secondaryActions.appendChild(backButton);
@@ -988,14 +989,10 @@ export function renderWorkoutRecordPage(root) {
   }
 
   const session = entry.session;
-  const hasOtherDraft = draft && draft.id !== session?.id &&
-    !history.some((item) => item.id === draft.id && item.completed === true) &&
-    (draft.exerciseLogs.some(hasRecordedSets) || draft.notes?.trim() ||
-      draft.exerciseLogs.some((log) => log.notes?.trim()));
+  const hasOtherDraft = draft?.id !== session?.id && hasUnsavedWorkout(draft, history);
 
-  if (hasOtherDraft && !session) {
-    root.innerHTML = '<section class="page"><h1>还有一场未完成的训练</h1>' +
-      '<p>请先回到历史继续那场训练。</p><a class="support-link" href="#history">查看历史 →</a></section>';
+  if (!session && getOtherUnfinishedWorkout(selection.planDayId, draft, history)) {
+    window.location.replace('#today');
     return;
   }
   if (hasOtherDraft && !window.confirm('当前还有一场未保存的训练，继续这场会离开当前草稿。确定继续吗？')) {

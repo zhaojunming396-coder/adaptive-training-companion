@@ -10,6 +10,7 @@ import { bodyRecomposition4DayPlan } from './src/data/trainingPlans/bodyRecompos
 import {
   alignWorkoutDraft,
   clearWorkoutDraft,
+  getOtherUnfinishedWorkout,
   getRecordEntry,
   getUnfinishedWorkout,
   readCompletedWorkoutHistory,
@@ -34,6 +35,7 @@ const startedAt = new Date('2026-11-12T10:00:00Z');
 let session = createWorkoutSession({ planDayId: day.planDayId, date: startedAt, startedAt });
 saveWorkoutDraft(session);
 assert.deepEqual(readWorkoutHistory(), []);
+assert.equal(getOtherUnfinishedWorkout(otherDay.planDayId), null);
 assert.equal(getUnfinishedWorkout(otherDay.planDayId), null);
 
 session = updateWorkoutSet(session, logged, 1, { weight: 50, reps: 10, rir: 2, completed: true });
@@ -42,6 +44,10 @@ saveWorkoutDraft(session);
 saveWorkoutDraft(session);
 assert.equal(readWorkoutHistory().length, 1);
 assert.equal(readWorkoutHistory()[0].completed, false);
+assert.equal(getOtherUnfinishedWorkout(day.planDayId), null);
+assert.equal(getOtherUnfinishedWorkout(otherDay.planDayId).id, session.id);
+assert.equal(getUnfinishedWorkout(otherDay.planDayId), null);
+assert.equal(getOtherUnfinishedWorkout(otherDay.planDayId, null).id, session.id);
 assert.deepEqual(readCompletedWorkoutHistory(), []);
 assert.equal(getLastExercisePerformance(logged, { completedOnly: true }), null);
 

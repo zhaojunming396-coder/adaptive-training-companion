@@ -156,7 +156,7 @@ function renderSession(page, session, history) {
   page.appendChild(stats);
 
   if (session.completed === false) {
-    const resume = element('button', 'primary-action', '继续训练');
+    const resume = element('button', 'primary-action history-resume', '继续训练');
     resume.addEventListener('click', () => navigateTo(`record:${encodeURIComponent(session.id)}`));
     page.appendChild(resume);
   }

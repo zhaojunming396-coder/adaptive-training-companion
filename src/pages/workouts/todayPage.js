@@ -700,9 +700,6 @@ export function renderTodayPage(root) {
   const page = document.createElement('section');
   page.className = 'page';
   const history = readCompletedWorkoutHistory();
-  const intro = document.createElement('div');
-  intro.className = 'today-intro';
-  page.appendChild(intro);
   const manual = createTodaySection('手动选择训练日', 'today-manual', manualOpen);
   const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
   const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
@@ -731,7 +728,7 @@ export function renderTodayPage(root) {
     tip.textContent = '恢复提示：可以轻松散步、做活动度练习，避免把休息日做成高强度训练。';
     hero.appendChild(tip);
 
-    intro.appendChild(hero);
+    page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
   } else {
     const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
@@ -778,7 +775,7 @@ export function renderTodayPage(root) {
       hero.append(notice, resume);
     }
 
-    intro.appendChild(hero);
+    page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
     renderExercisePlanner(settings, detail, root);
     renderKeyExerciseFeedback(supporting, detail);

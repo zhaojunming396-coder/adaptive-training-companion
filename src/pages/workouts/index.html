@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#34c759">
+    <meta name="theme-color" content="#3D7AB8">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="训练助手">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,15 +17,18 @@
 
       :root {
         color-scheme: dark;
-        --bg: #0f1411;
-        --surface: #171f1a;
-        --surface-2: #202a24;
-        --text: #f4f7f2;
-        --muted: #a8b3aa;
-        --line: #2f3c34;
-        --accent: #34c759;
-        --accent-strong: #21a447;
-        --warning: #ffb020;
+        --bg: #141414;
+        --surface: #1C1C1C;
+        --surface-2: #262626;
+        --text: #f4f4f4;
+        --muted: #b0b0b0;
+        --line: #383838;
+        --accent: #3D7AB8;
+        --on-accent: #000;
+        --accent-text: color-mix(in srgb, var(--accent) 74%, white);
+        --accent-tint: color-mix(in srgb, var(--accent) 18%, var(--surface));
+        --warning: #493a26;
+        --warning-text: #e3c393;
         --danger: #ff6b6b;
       }
 
@@ -57,7 +60,7 @@
         max-width: 480px;
         margin: 0 auto 16px;
         padding: 10px 16px;
-        background: rgba(15, 20, 17, 0.96);
+        background: var(--bg);
         border-bottom: 1px solid var(--line);
       }
 
@@ -78,7 +81,7 @@
         max-width: 480px;
         padding: 4px 16px 12px;
         margin: auto;
-        color: var(--accent);
+        color: var(--accent-text);
         font-size: 14px;
       }
 
@@ -87,7 +90,7 @@
       }
 
       nav a[aria-current] {
-        color: #06120a;
+        color: var(--on-accent);
         background: var(--accent);
         font-weight: 700;
       }
@@ -142,7 +145,7 @@
         border: 0;
         border-radius: 12px;
         padding: 10px 14px;
-        color: #06120a;
+        color: var(--on-accent);
         background: var(--accent);
         font-weight: 700;
         font-size: 16px;
@@ -292,7 +295,7 @@
       .support-link {
         display: inline-block;
         padding: 2px 0 14px;
-        color: var(--accent);
+        color: var(--accent-text);
         font-size: 14px;
       }
 
@@ -336,7 +339,7 @@
         border-radius: 18px;
         padding: 12px;
         margin-bottom: 12px;
-        background: rgba(23, 31, 26, 0.96);
+        background: var(--surface);
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
       }
 
@@ -402,11 +405,11 @@
         border-radius: 24px;
         padding: 18px;
         margin-bottom: 14px;
-        background: linear-gradient(180deg, #1d2921 0%, var(--surface) 100%);
+        background: var(--surface);
       }
 
       .eyebrow {
-        color: var(--accent);
+        color: var(--accent-text);
         font-size: 13px;
         font-weight: 700;
         margin-bottom: 8px;
@@ -482,17 +485,17 @@
         border-radius: 14px;
         padding: 12px;
         margin: 8px 0;
-        background: rgba(52, 199, 89, 0.08);
+        background: var(--surface-2);
       }
 
       .recommendation-card {
         max-width: 100%;
         min-width: 0;
-        border: 1px solid rgba(255, 176, 32, 0.38);
+        border: 1px solid var(--line);
         border-radius: 14px;
         padding: 12px;
         margin: 8px 0;
-        background: rgba(255, 176, 32, 0.1);
+        background: var(--surface-2);
       }
 
       .exercise-guidance {
@@ -533,8 +536,8 @@
         margin-top: 4px;
         border-radius: 999px;
         padding: 3px 8px;
-        color: #06120a;
-        background: var(--warning);
+        color: var(--text);
+        background: var(--line);
         font-weight: 750;
       }
 
@@ -550,11 +553,11 @@
       }
 
       .feedback-card {
-        border: 1px solid rgba(52, 199, 89, 0.36);
+        border: 1px solid var(--line);
         border-radius: 20px;
         padding: 16px;
         margin-bottom: 14px;
-        background: linear-gradient(180deg, rgba(52, 199, 89, 0.14) 0%, var(--surface) 100%);
+        background: var(--surface);
       }
 
       .feedback-card h2 {
@@ -565,21 +568,8 @@
         margin-bottom: 8px;
       }
 
-      .feedback-baseline {
-        border-color: rgba(255, 176, 32, 0.42);
-        background: linear-gradient(180deg, rgba(255, 176, 32, 0.14) 0%, var(--surface) 100%);
-      }
-
       .feedback-reduce {
         border-color: rgba(255, 107, 107, 0.42);
-        background: linear-gradient(180deg, rgba(255, 107, 107, 0.14) 0%, var(--surface) 100%);
-      }
-
-      .feedback-maintain,
-      .feedback-recovery,
-      .feedback-catch_up {
-        border-color: rgba(86, 154, 255, 0.34);
-        background: linear-gradient(180deg, rgba(86, 154, 255, 0.12) 0%, var(--surface) 100%);
       }
 
       .feedback-label {
@@ -589,27 +579,22 @@
         border-radius: 999px;
         padding: 4px 10px;
         margin-bottom: 10px;
-        color: #06120a;
-        background: var(--accent);
+        color: var(--text);
+        background: var(--line);
         font-size: 12px;
         font-weight: 800;
       }
 
-      .feedback-baseline .feedback-label {
+      .feedback-baseline .feedback-label,
+      .feedback-row-baseline .feedback-row-head span,
+      .guidance-strategy-baseline {
         background: var(--warning);
-        color: #1a1000;
+        color: var(--warning-text);
       }
 
       .feedback-reduce .feedback-label {
         background: var(--danger);
         color: #1f0707;
-      }
-
-      .feedback-maintain .feedback-label,
-      .feedback-recovery .feedback-label,
-      .feedback-catch_up .feedback-label {
-        color: var(--text);
-        background: #2b5f9e;
       }
 
       .feedback-evidence {
@@ -652,21 +637,6 @@
         background: var(--surface-2);
       }
 
-      .feedback-row-progress {
-        border-color: rgba(52, 199, 89, 0.38);
-        background: rgba(52, 199, 89, 0.1);
-      }
-
-      .feedback-row-maintain {
-        border-color: rgba(86, 154, 255, 0.34);
-        background: rgba(86, 154, 255, 0.09);
-      }
-
-      .feedback-row-baseline {
-        border-color: rgba(255, 176, 32, 0.38);
-        background: rgba(255, 176, 32, 0.1);
-      }
-
       .feedback-row-reduce {
         border-color: rgba(255, 107, 107, 0.42);
         background: rgba(255, 107, 107, 0.1);
@@ -684,7 +654,7 @@
         border-radius: 999px;
         padding: 3px 8px;
         color: var(--text);
-        background: rgba(244, 247, 242, 0.1);
+        background: var(--line);
         font-size: 12px;
         font-weight: 750;
       }
@@ -706,7 +676,7 @@
 
       .feedback-row small {
         display: block;
-        border-top: 1px solid rgba(244, 247, 242, 0.1);
+        border-top: 1px solid var(--line);
         padding-top: 7px;
       }
 
@@ -777,7 +747,7 @@
         display: inline-flex;
         align-items: center;
         min-height: 44px;
-        color: var(--accent);
+        color: var(--accent-text);
         font-size: 14px;
       }
 
@@ -836,15 +806,16 @@
       }
 
       .source-line {
-        color: var(--accent);
+        color: var(--accent-text);
         font-weight: 700;
       }
 
       .restore-auto-button {
         width: 100%;
         margin-top: 12px;
-        color: #06120a;
-        background: var(--warning);
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
       }
 
       .planner-card {
@@ -892,7 +863,7 @@
         width: 30px;
         height: 30px;
         border-radius: 999px;
-        color: #06120a;
+        color: var(--on-accent);
         background: var(--accent);
         font-size: 14px;
         font-weight: 800;
@@ -1012,9 +983,9 @@
       }
 
       .rir-option.active {
-        color: #06120a;
+        color: var(--on-accent);
         background: var(--accent);
-        border-color: var(--accent);
+        border-color: var(--accent-text);
       }
 
       .set-completed {
@@ -1035,7 +1006,7 @@
       }
 
       .set-complete-button-done {
-        color: #06120a;
+        color: var(--on-accent);
         background: var(--accent);
       }
 
@@ -1055,9 +1026,9 @@
       }
 
       .success-notice {
-        color: var(--accent);
-        background: rgba(52, 199, 89, 0.12);
-        border-color: rgba(52, 199, 89, 0.3);
+        color: var(--accent-text);
+        background: var(--accent-tint);
+        border-color: var(--accent);
         margin-bottom: 12px;
       }
 
@@ -1077,8 +1048,8 @@
       }
 
       .choice-button.active {
-        background: var(--warning);
-        color: #1a1000;
+        background: var(--accent);
+        color: var(--on-accent);
       }
 
       details > summary {
@@ -1135,12 +1106,20 @@
         bottom: 0;
         margin: 16px 0 0;
         padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
-        background: rgba(15, 20, 17, 0.96);
+        background: var(--bg);
         border-top: 1px solid var(--line);
       }
 
       .sticky-actions button {
         width: 100%;
+      }
+
+      @media (max-width: 480px) {
+        .today-intro {
+          /* Four-tab nav, including its bottom margin. */
+          min-height: calc(100svh - 73px);
+          display: flow-root;
+        }
       }
 
       @media (max-width: 360px) {

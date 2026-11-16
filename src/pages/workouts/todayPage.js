@@ -596,10 +596,6 @@ function renderManualSelector(page, root) {
   const card = document.createElement('section');
   card.className = 'exercise';
 
-  const title = document.createElement('h2');
-  title.textContent = '手动选择训练日';
-  card.appendChild(title);
-
   const hint = document.createElement('p');
   hint.className = 'source-line';
   hint.textContent = `当前来源：${getSelectionSourceText()}`;
@@ -698,11 +694,16 @@ export function renderTodayPage(root) {
 
   const settingsOpen = root.querySelector('.today-settings')?.open ?? false;
   const feedbackOpen = root.querySelector('.today-feedback')?.open ?? false;
+  const manualOpen = root.querySelector('.today-manual')?.open ?? false;
   root.innerHTML = '';
 
   const page = document.createElement('section');
   page.className = 'page';
   const history = readCompletedWorkoutHistory();
+  const intro = document.createElement('div');
+  intro.className = 'today-intro';
+  page.appendChild(intro);
+  const manual = createTodaySection('手动选择训练日', 'today-manual', manualOpen);
   const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
   const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
@@ -730,7 +731,7 @@ export function renderTodayPage(root) {
     tip.textContent = '恢复提示：可以轻松散步、做活动度练习，避免把休息日做成高强度训练。';
     hero.appendChild(tip);
 
-    page.appendChild(hero);
+    intro.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
   } else {
     const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
@@ -777,7 +778,7 @@ export function renderTodayPage(root) {
       hero.append(notice, resume);
     }
 
-    page.appendChild(hero);
+    intro.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
     renderExercisePlanner(settings, detail, root);
     renderKeyExerciseFeedback(supporting, detail);
@@ -789,8 +790,9 @@ export function renderTodayPage(root) {
     hero.appendChild(detailLink);
   }
 
-  renderManualSelector(settings, root);
+  renderManualSelector(manual, root);
   renderNutritionSummaryCard(supporting);
-  page.append(settings, supporting);
+  if (!selection.isRestDay) page.appendChild(settings);
+  page.append(manual, supporting);
   root.appendChild(page);
 }

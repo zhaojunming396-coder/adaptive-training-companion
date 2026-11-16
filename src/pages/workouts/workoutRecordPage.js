@@ -435,10 +435,11 @@ function renderExerciseGuidance(exerciseId, exercise, planExercise, history, use
     ? recommendation.suggestedDurationText
     : recommendation.suggestedWeightText;
   const strategyText = recommendationLabel(recommendation);
+  const baselineClass = recommendation.strategy === '暂无建议' ? ' guidance-strategy-baseline' : '';
   today.innerHTML = `<span class="guidance-label">今天建议</span>
     <strong>${suggestedValue || '自主选择'}</strong>
     <span>${recommendation.suggestedRepsText ? `目标 ${recommendation.suggestedRepsText}` : ''}</span>
-    ${strategyText ? `<span class="guidance-strategy">${strategyText}</span>` : ''}`;
+    ${strategyText ? `<span class="guidance-strategy${baselineClass}">${strategyText}</span>` : ''}`;
   wrapper.appendChild(today);
 
   const reason = document.createElement('details');

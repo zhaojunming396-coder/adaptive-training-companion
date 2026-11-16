@@ -242,10 +242,17 @@ export function getTodayTrainingSelection({
   };
 }
 
+function getSessionPlanExercises(planDay, exerciseIds) {
+  if (!exerciseIds) return getEffectiveTrainingDayExercises(planDay);
+  const byId = new Map(planDay.exercises.map((exercise) => [exercise.exerciseId, exercise]));
+  return exerciseIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
 export function buildTrainingDayDetail({
   plan = bodyRecomposition4DayPlan,
   exerciseList = defaultExercises,
   planDayId,
+  exerciseIds,
   date = new Date(),
   timeZone = DEFAULT_TIME_ZONE
 } = {}) {
@@ -268,7 +275,7 @@ export function buildTrainingDayDetail({
   }
 
   const exerciseMap = getExerciseMap(exerciseList);
-  const effectiveExercises = getEffectiveTrainingDayExercises(selection.planDay);
+  const effectiveExercises = getSessionPlanExercises(selection.planDay, exerciseIds);
   const enrichedExercises = effectiveExercises.map((planExercise) => {
     const detail = exerciseMap.get(planExercise.exerciseId) || null;
 
@@ -306,6 +313,7 @@ export function createWorkoutSession({
   plan = bodyRecomposition4DayPlan,
   exerciseList = defaultExercises,
   planDayId,
+  exerciseIds,
   date = new Date(),
   timeZone = DEFAULT_TIME_ZONE,
   startedAt = new Date()
@@ -318,7 +326,7 @@ export function createWorkoutSession({
 
   const sessionDate = formatDate(date, timeZone);
   const exerciseMap = getExerciseMap(exerciseList);
-  const exerciseLogs = getEffectiveTrainingDayExercises(planDay).map((planExercise) => {
+  const exerciseLogs = getSessionPlanExercises(planDay, exerciseIds).map((planExercise) => {
     const log = createExerciseLog(planExercise, exerciseMap.get(planExercise.exerciseId));
     return {
       ...log,
@@ -403,10 +411,11 @@ export function readWorkoutHistory({ storage = getRuntimeStorage() } = {}) {
 
 export function getLastExerciseLog(exerciseId, {
   storage = getRuntimeStorage(),
-  excludeSessionId = ''
+  excludeSessionId = '',
+  completedOnly = false
 } = {}) {
   const history = readRawHistory(storage)
-    .filter((session) => session.id !== excludeSessionId)
+    .filter((session) => session.id !== excludeSessionId && (!completedOnly || session.completed !== false))
     .slice()
     .sort((a, b) => getSessionEndTime(b) - getSessionEndTime(a));
 

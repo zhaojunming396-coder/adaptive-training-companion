@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adaptive-training-companion-v070';
+const CACHE_NAME = 'adaptive-training-companion-v072';
 
 const CORE_ASSETS = [
   './',
@@ -9,6 +9,7 @@ const CORE_ASSETS = [
   './todayPage.js',
   './trainingDetailPage.js',
   './workoutRecordPage.js',
+  './workoutDraft.js',
   './workoutHistoryPage.js',
   './profilePage.js',
   './backupPage.js',

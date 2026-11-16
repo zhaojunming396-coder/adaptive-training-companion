@@ -1,9 +1,15 @@
+import {
+  alignWorkoutDraft,
+  getOtherUnfinishedWorkout,
+  getUnfinishedWorkout,
+  hasRecordedSets,
+  readCompletedWorkoutHistory
+} from './workoutDraft.js';
 import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
 import {
   getLastExercisePerformance,
   getTodayTrainingSelection,
-  buildTrainingDayDetail,
-  readWorkoutHistory
+  buildTrainingDayDetail
 } from '../../data/workouts/workoutSession.js';
 import {
   buildTrainingOverview,
@@ -27,15 +33,12 @@ import {
 import { bodyRecomposition4DayPlan } from '../../data/trainingPlans/bodyRecomposition4DayPlan.js';
 import { exercises } from '../../data/exercises/exercises.js';
 import {
-  addTrainingDayExercise,
-  getAvailableTrainingDayExerciseIds,
+  getDefaultTrainingDayExerciseIds,
   getTrainingDayExerciseIds,
   MAX_SESSION_EXERCISE_COUNT,
   MIN_SESSION_EXERCISE_COUNT,
-  moveTrainingDayExercise,
-  reorderTrainingDayExercise,
-  removeTrainingDayExercise,
-  resetTrainingDayExerciseIds
+  resetTrainingDayExerciseIds,
+  saveTrainingDayExerciseIds
 } from '../../data/workouts/trainingDayPreferences.js';
 import {
   getTodayProteinProgress,
@@ -387,7 +390,7 @@ function renderKeyExerciseFeedback(page, detail) {
   card.appendChild(title);
 
   const profile = readUserTrainingProfile();
-  const history = readWorkoutHistory();
+  const history = readCompletedWorkoutHistory();
   const list = document.createElement('div');
   list.className = 'feedback-list';
 
@@ -403,7 +406,7 @@ function renderKeyExerciseFeedback(page, detail) {
       recentExerciseLogs,
       userProfile: profile
     });
-    const lastPerformance = getLastExercisePerformance(exercise.exerciseId);
+    const lastPerformance = getLastExercisePerformance(exercise.exerciseId, { completedOnly: true });
     const strategyText = recommendationLabel(recommendation);
     const row = document.createElement('div');
     row.className = `feedback-row feedback-row-${getRecommendationTone(recommendation.strategy)}`;
@@ -439,10 +442,6 @@ function getExerciseNameById(detail, exerciseId) {
       : exerciseId;
 }
 
-function getPlanExerciseNameById(detail, exerciseId) {
-  return getExerciseNameById(detail, exerciseId);
-}
-
 function renderExercisePlanner(page, detail, root) {
   const planDay = getManualPlanDay(detail.planDayId);
 
@@ -450,8 +449,22 @@ function renderExercisePlanner(page, detail, root) {
     return;
   }
 
-  const selectedIds = getTrainingDayExerciseIds(planDay);
-  const hiddenIds = getAvailableTrainingDayExerciseIds(planDay);
+  const session = getUnfinishedWorkout(planDay.planDayId);
+  const availableIds = planDay.exercises.map((exercise) => exercise.exerciseId);
+  const selectedIds = session?.exerciseLogs.map((log) => log.exerciseId) || getTrainingDayExerciseIds(planDay);
+  const hiddenIds = availableIds.filter((id) => !selectedIds.includes(id));
+  const applyOrder = (ids, reset = false) => {
+    if (reset) resetTrainingDayExerciseIds(planDay);
+    else saveTrainingDayExerciseIds(planDay, ids);
+    if (session) alignWorkoutDraft(session, ids);
+    renderTodayPage(root);
+  };
+  const moveTo = (index, nextIndex) => {
+    const ids = selectedIds.slice();
+    const [id] = ids.splice(index, 1);
+    ids.splice(nextIndex, 0, id);
+    applyOrder(ids);
+  };
   const card = document.createElement('section');
   card.className = 'exercise planner-card';
 
@@ -472,9 +485,11 @@ function renderExercisePlanner(page, detail, root) {
   resetButton.className = 'secondary-button compact-button';
   resetButton.textContent = '恢复默认';
   resetButton.addEventListener('click', () => {
-    resetTrainingDayExerciseIds(planDay);
-    appState.activeSession = null;
-    renderTodayPage(root);
+    const ids = getDefaultTrainingDayExerciseIds(planDay);
+    const dropsRecords = session?.exerciseLogs.some((log) =>
+      !ids.includes(log.exerciseId) && hasRecordedSets(log));
+    if (dropsRecords && !window.confirm('恢复默认顺序可能会拿掉已有组记录的动作。确定恢复吗？')) return;
+    applyOrder(ids, true);
   });
   header.appendChild(resetButton);
   card.appendChild(header);
@@ -501,17 +516,15 @@ function renderExercisePlanner(page, detail, root) {
     positionLabel.className = 'planner-position field-label';
     positionLabel.append('顺序');
     const position = document.createElement('select');
-    position.value = String(index);
     selectedIds.forEach((_, optionIndex) => {
       const option = document.createElement('option');
       option.value = String(optionIndex);
       option.textContent = `第 ${optionIndex + 1} 个`;
       position.appendChild(option);
     });
+    position.value = String(index);
     position.addEventListener('change', () => {
-      reorderTrainingDayExercise(planDay, exerciseId, Number(position.value));
-      appState.activeSession = null;
-      renderTodayPage(root);
+      moveTo(index, Number(position.value));
     });
     positionLabel.appendChild(position);
     controls.appendChild(positionLabel);
@@ -522,9 +535,7 @@ function renderExercisePlanner(page, detail, root) {
     up.title = '上移';
     up.disabled = index === 0;
     up.addEventListener('click', () => {
-      moveTrainingDayExercise(planDay, exerciseId, 'up');
-      appState.activeSession = null;
-      renderTodayPage(root);
+      moveTo(index, index - 1);
     });
     controls.appendChild(up);
 
@@ -534,9 +545,7 @@ function renderExercisePlanner(page, detail, root) {
     down.title = '下移';
     down.disabled = index === selectedIds.length - 1;
     down.addEventListener('click', () => {
-      moveTrainingDayExercise(planDay, exerciseId, 'down');
-      appState.activeSession = null;
-      renderTodayPage(root);
+      moveTo(index, index + 1);
     });
     controls.appendChild(down);
 
@@ -545,9 +554,10 @@ function renderExercisePlanner(page, detail, root) {
     remove.textContent = '移除';
     remove.disabled = selectedIds.length <= MIN_SESSION_EXERCISE_COUNT;
     remove.addEventListener('click', () => {
-      removeTrainingDayExercise(planDay, exerciseId);
-      appState.activeSession = null;
-      renderTodayPage(root);
+      const log = session?.exerciseLogs.find((item) => item.exerciseId === exerciseId);
+      if (log && hasRecordedSets(log) &&
+          !window.confirm('这个动作已有组记录，移除后这些组会从本次草稿里拿掉。确定移除吗？')) return;
+      applyOrder(selectedIds.filter((id) => id !== exerciseId));
     });
     controls.appendChild(remove);
 
@@ -569,12 +579,10 @@ function renderExercisePlanner(page, detail, root) {
     hiddenIds.forEach((exerciseId) => {
       const button = document.createElement('button');
       button.className = 'secondary-button';
-      button.textContent = `加回：${getPlanExerciseNameById(detail, exerciseId)}`;
+      button.textContent = `加回：${getExerciseNameById(detail, exerciseId)}`;
       button.disabled = selectedIds.length >= MAX_SESSION_EXERCISE_COUNT;
       button.addEventListener('click', () => {
-        addTrainingDayExercise(planDay, exerciseId);
-        appState.activeSession = null;
-        renderTodayPage(root);
+        applyOrder([...selectedIds, exerciseId]);
       });
       addGrid.appendChild(button);
     });
@@ -694,7 +702,7 @@ export function renderTodayPage(root) {
 
   const page = document.createElement('section');
   page.className = 'page';
-  const history = readWorkoutHistory();
+  const history = readCompletedWorkoutHistory();
   const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
   const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
@@ -747,12 +755,27 @@ export function renderTodayPage(root) {
 
     const startButton = document.createElement('button');
     startButton.className = 'primary-action';
-    startButton.textContent = '开始训练';
+    const currentWorkout = getUnfinishedWorkout(detail.planDayId);
+    const otherWorkout = currentWorkout ? null : getOtherUnfinishedWorkout(detail.planDayId);
+    startButton.textContent = currentWorkout ? '继续训练' : '开始训练';
     startButton.addEventListener('click', () => {
-      appState.activeSession = null;
-      navigateTo('record');
+      if (!otherWorkout) navigateTo('record');
     });
     hero.appendChild(startButton);
+
+    if (otherWorkout) {
+      const notice = document.createElement('p');
+      notice.className = 'today-resume-notice';
+      notice.textContent = '还有一场未完成的训练，先继续那场。';
+      const resume = document.createElement('button');
+      resume.className = 'secondary-button';
+      resume.textContent = '继续那场训练';
+      resume.addEventListener('click', () => {
+        navigateTo(`record:${encodeURIComponent(otherWorkout.id)}`);
+        window.history.replaceState({ recordSource: 'today' }, '');
+      });
+      hero.append(notice, resume);
+    }
 
     page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);

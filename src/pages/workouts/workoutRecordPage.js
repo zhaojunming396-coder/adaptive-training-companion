@@ -1,3 +1,12 @@
+import {
+  clearWorkoutDraft,
+  getRecordEntry,
+  getOtherUnfinishedWorkout,
+  hasUnsavedWorkout,
+  readCompletedWorkoutHistory,
+  readWorkoutDraft,
+  saveWorkoutDraft
+} from './workoutDraft.js';
 import { recommendationLabel, recommendationReason } from './recommendationCopy.js';
 import {
   buildWorkoutSummary,
@@ -20,6 +29,7 @@ import {
   appState,
   navigateTo,
   notifyRestFinished,
+  selectTrainingDay,
   setRestVibrationEnabled,
   toNumberOrNull
 } from './appState.js';
@@ -31,44 +41,6 @@ let restTimer = {
 };
 let setCompletionErrors = {};
 let selectedRecordExerciseId = '';
-const ACTIVE_WORKOUT_DRAFT_STORAGE_KEY = 'activeWorkoutDraft.v1';
-
-const memoryStorage = {
-  data: {},
-  getItem(key) {
-    return this.data[key] || null;
-  },
-  setItem(key, value) {
-    this.data[key] = value;
-  },
-  removeItem(key) {
-    delete this.data[key];
-  }
-};
-
-function getRuntimeStorage() {
-  if (typeof wx !== 'undefined' && wx && wx.getStorageSync && wx.setStorageSync && wx.removeStorageSync) {
-    return {
-      getItem(key) {
-        const value = wx.getStorageSync(key);
-        return value === undefined || value === null || value === '' ? null : JSON.stringify(value);
-      },
-      setItem(key, value) {
-        wx.setStorageSync(key, JSON.parse(value));
-      },
-      removeItem(key) {
-        wx.removeStorageSync(key);
-      }
-    };
-  }
-
-  if (typeof localStorage !== 'undefined') {
-    return localStorage;
-  }
-
-  return memoryStorage;
-}
-
 function getExerciseDetailMap(detail) {
   return new Map(detail.exercises.map((item) => [item.exerciseId, item]));
 }
@@ -81,41 +53,6 @@ function setPatchFromInput(input) {
   const field = input.dataset.field;
 
   return { [field]: toNumberOrNull(input.value) };
-}
-
-function readWorkoutDraft() {
-  const storage = getRuntimeStorage();
-
-  try {
-    const raw = storage.getItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && parsed.session ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveWorkoutDraft(session, detail) {
-  const storage = getRuntimeStorage();
-
-  if (!session || !detail || detail.isRestDay) {
-    return;
-  }
-
-  storage.setItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY, JSON.stringify({
-    planDayId: detail.planDayId,
-    exerciseIds: getDetailExerciseIds(detail),
-    session,
-    updatedAt: new Date().toISOString()
-  }));
-}
-
-function clearWorkoutDraft() {
-  const storage = getRuntimeStorage();
-
-  if (storage && storage.removeItem) {
-    storage.removeItem(ACTIVE_WORKOUT_DRAFT_STORAGE_KEY);
-  }
 }
 
 function getSetFields(exercise) {
@@ -440,7 +377,8 @@ function startRestTimer(seconds) {
 
 function summarizeLastPerformance(exerciseId) {
   const performance = getLastExercisePerformance(exerciseId, {
-    excludeSessionId: appState.activeSession && appState.activeSession.id
+    excludeSessionId: appState.activeSession && appState.activeSession.id,
+    completedOnly: true
   });
 
   if (!performance || !Array.isArray(performance.sets) || performance.sets.length === 0) {
@@ -661,7 +599,7 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
 
   const progressSummary = buildAdaptiveWorkoutSummary({
     currentSession: savedSession,
-    history: readWorkoutHistory(),
+    history: readCompletedWorkoutHistory(),
     planExercises: detail.exercises,
     exerciseList: exercises,
     userProfile: readUserTrainingProfile()
@@ -728,33 +666,6 @@ function renderWorkoutSummary(root, summary, detail, savedSession) {
 
   page.appendChild(actions);
   root.appendChild(page);
-}
-
-function getSessionExerciseIds(session) {
-  return (Array.isArray(session && session.exerciseLogs) ? session.exerciseLogs : [])
-    .map((log) => log.exerciseId);
-}
-
-function getDetailExerciseIds(detail) {
-  return (Array.isArray(detail && detail.exercises) ? detail.exercises : [])
-    .map((exercise) => exercise.exerciseId);
-}
-
-function hasSameExerciseOrder(session, detail) {
-  const sessionIds = getSessionExerciseIds(session);
-  const detailIds = getDetailExerciseIds(detail);
-
-  return sessionIds.length === detailIds.length && sessionIds.every((exerciseId, index) => exerciseId === detailIds[index]);
-}
-
-function getRestorableDraftSession(detail) {
-  const draft = readWorkoutDraft();
-
-  if (!draft || !draft.session || draft.planDayId !== detail.planDayId) {
-    return null;
-  }
-
-  return hasSameExerciseOrder(draft.session, detail) ? draft.session : null;
 }
 
 function isExerciseLogComplete(log) {
@@ -854,7 +765,7 @@ function renderExerciseSwitcher(session, exerciseDetailMap, onSelect) {
 
 function renderSession(root, session, detail, messages = []) {
   const exerciseDetailMap = getExerciseDetailMap(detail);
-  const history = readWorkoutHistory();
+  const history = readCompletedWorkoutHistory();
   const userProfile = readUserTrainingProfile();
 
   root.innerHTML = '';
@@ -916,7 +827,7 @@ function renderSession(root, session, detail, messages = []) {
     }
 
     appState.activeSession = updateWorkoutSet(appState.activeSession, exerciseId, setIndex, patch);
-    saveWorkoutDraft(appState.activeSession, detail);
+    saveWorkoutDraft(appState.activeSession);
     const becameCompleted = patch.completed === true && wasCompleted !== true;
 
     if (patch.completed !== true && setCompletionErrors[errorKey]) {
@@ -959,8 +870,12 @@ function renderSession(root, session, detail, messages = []) {
 
   if (activeLog) {
     const log = activeLog;
-    const exercise = exerciseDetailMap.get(log.exerciseId);
     const fullExercise = getFullExercise(log.exerciseId);
+    const exercise = exerciseDetailMap.get(log.exerciseId) || {
+      exerciseId: log.exerciseId,
+      detail: fullExercise,
+      target: log.target || {}
+    };
     const card = document.createElement('article');
     card.className = 'exercise';
 
@@ -992,7 +907,7 @@ function renderSession(root, session, detail, messages = []) {
       ...appState.activeSession,
       notes: notes.value
     };
-    saveWorkoutDraft(appState.activeSession, detail);
+    saveWorkoutDraft(appState.activeSession);
   });
   noteLabel.appendChild(notes);
   notePanel.appendChild(noteLabel);
@@ -1003,8 +918,9 @@ function renderSession(root, session, detail, messages = []) {
 
   const backButton = document.createElement('button');
   backButton.className = 'secondary-button';
-  backButton.textContent = '返回详情';
-  backButton.addEventListener('click', () => navigateTo('detail'));
+  const fromHistory = window.location.hash.startsWith('#record:') && window.history.state?.recordSource !== 'today';
+  backButton.textContent = fromHistory ? '返回历史' : '返回详情';
+  backButton.addEventListener('click', () => navigateTo(fromHistory ? 'history' : 'detail'));
   secondaryActions.appendChild(backButton);
   page.appendChild(secondaryActions);
 
@@ -1045,9 +961,16 @@ function renderSession(root, session, detail, messages = []) {
 }
 
 export function renderWorkoutRecordPage(root) {
-  const detail = getDetailForCurrentSelection();
+  const selection = getDetailForCurrentSelection();
+  const draft = readWorkoutDraft();
+  const history = readWorkoutHistory();
+  const entry = getRecordEntry(window.location.hash, draft, history, selection.planDayId);
+  if (entry.redirect) {
+    navigateTo(entry.redirect);
+    return;
+  }
 
-  if (detail.isRestDay) {
+  if (!entry.fromHistory && selection.isRestDay) {
     root.innerHTML = [
       '<section class="page">',
       '<div class="hero-card">',
@@ -1065,22 +988,37 @@ export function renderWorkoutRecordPage(root) {
     return;
   }
 
-  if (!appState.activeSession) {
-    appState.activeSession = getRestorableDraftSession(detail) || createWorkoutSession({
-      planDayId: appState.selectedPlanDayId || undefined
-    });
-    saveWorkoutDraft(appState.activeSession, detail);
+  const session = entry.session;
+  const hasOtherDraft = draft?.id !== session?.id && hasUnsavedWorkout(draft, history);
+
+  if (!session && getOtherUnfinishedWorkout(selection.planDayId, draft, history)) {
+    window.location.replace('#today');
+    return;
+  }
+  if (hasOtherDraft && !window.confirm('当前还有一场未保存的训练，继续这场会离开当前草稿。确定继续吗？')) {
+    const back = entry.fromHistory ? `history:${encodeURIComponent(session.id)}` : 'today';
+    window.location.replace(`#${back}`);
+    return;
+  }
+  if (hasOtherDraft) saveWorkoutDraft(draft);
+
+  const detail = session ? buildTrainingDayDetail({
+    planDayId: session.planDayId,
+    exerciseIds: session.exerciseLogs.map((log) => log.exerciseId)
+  }) : selection;
+  if (detail.isRestDay) {
+    navigateTo('history');
+    return;
   }
 
-  if (
-    appState.activeSession.planDayId !== detail.planDayId ||
-    !hasSameExerciseOrder(appState.activeSession, detail)
-  ) {
-    appState.activeSession = createWorkoutSession({
-      planDayId: appState.selectedPlanDayId || undefined
-    });
-    saveWorkoutDraft(appState.activeSession, detail);
+  if (entry.fromHistory) selectTrainingDay(detail.planDayId);
+  const next = session || createWorkoutSession({ planDayId: detail.planDayId });
+  if (appState.activeSession?.id !== next.id) {
+    setCompletionErrors = {};
+    selectedRecordExerciseId = '';
+    stopRestTimer();
   }
-
-  renderSession(root, appState.activeSession, detail);
+  appState.activeSession = next;
+  saveWorkoutDraft(next);
+  renderSession(root, next, detail);
 }

@@ -1092,6 +1092,24 @@
         background: var(--surface);
       }
 
+      @media (prefers-reduced-motion: no-preference) {
+        .primary-action {
+          transition: transform 120ms ease-out;
+        }
+
+        .primary-action:enabled:active {
+          transform: scale(0.98);
+        }
+
+        nav a {
+          transition: background-color 120ms ease-out, color 120ms ease-out;
+        }
+
+        .today-secondary > summary::after {
+          transition: transform 120ms ease-out;
+        }
+      }
+
       .today-secondary + .today-secondary {
         margin-top: 8px;
       }

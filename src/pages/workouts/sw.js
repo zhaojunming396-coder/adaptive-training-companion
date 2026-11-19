@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adaptive-training-companion-v080';
+const CACHE_NAME = 'adaptive-training-companion-v081';
 
 const CORE_ASSETS = [
   './',

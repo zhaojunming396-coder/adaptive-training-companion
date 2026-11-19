@@ -471,15 +471,9 @@ function renderExercisePlanner(page, detail, root) {
   const header = document.createElement('div');
   header.className = 'planner-header';
 
-  const titleGroup = document.createElement('div');
   const title = document.createElement('h2');
   title.textContent = '本次动作顺序';
-  const hint = document.createElement('p');
-  hint.className = 'source-line';
-  hint.textContent = `当前 ${selectedIds.length} 个动作，建议保持 ${MIN_SESSION_EXERCISE_COUNT}-${MAX_SESSION_EXERCISE_COUNT} 个。`;
-  titleGroup.appendChild(title);
-  titleGroup.appendChild(hint);
-  header.appendChild(titleGroup);
+  header.appendChild(title);
 
   const resetButton = document.createElement('button');
   resetButton.className = 'secondary-button compact-button';
@@ -511,23 +505,6 @@ function renderExercisePlanner(page, detail, root) {
 
     const controls = document.createElement('div');
     controls.className = 'planner-controls';
-
-    const positionLabel = document.createElement('label');
-    positionLabel.className = 'planner-position field-label';
-    positionLabel.append('顺序');
-    const position = document.createElement('select');
-    selectedIds.forEach((_, optionIndex) => {
-      const option = document.createElement('option');
-      option.value = String(optionIndex);
-      option.textContent = `第 ${optionIndex + 1} 个`;
-      position.appendChild(option);
-    });
-    position.value = String(index);
-    position.addEventListener('change', () => {
-      moveTo(index, Number(position.value));
-    });
-    positionLabel.appendChild(position);
-    controls.appendChild(positionLabel);
 
     const up = document.createElement('button');
     up.className = 'secondary-button icon-button';
@@ -566,27 +543,25 @@ function renderExercisePlanner(page, detail, root) {
   });
   card.appendChild(list);
 
-  if (hiddenIds.length > 0) {
-    const addTitle = document.createElement('p');
-    addTitle.className = 'muted';
-    addTitle.textContent = selectedIds.length >= MAX_SESSION_EXERCISE_COUNT
-      ? '已经达到 6 个动作，想加新动作需要先移除一个。'
-      : '需要时可以把下面动作加回本次训练。';
-    card.appendChild(addTitle);
-
+  if (selectedIds.length >= MAX_SESSION_EXERCISE_COUNT) {
+    const hint = document.createElement('p');
+    hint.textContent = '已满 6 个动作，移除一个后可加回其他动作。';
+    card.appendChild(hint);
+  } else if (hiddenIds.length > 0) {
+    const reserve = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = '加回动作';
     const addGrid = document.createElement('div');
     addGrid.className = 'planner-add-grid';
     hiddenIds.forEach((exerciseId) => {
       const button = document.createElement('button');
       button.className = 'secondary-button';
       button.textContent = `加回：${getExerciseNameById(detail, exerciseId)}`;
-      button.disabled = selectedIds.length >= MAX_SESSION_EXERCISE_COUNT;
-      button.addEventListener('click', () => {
-        applyOrder([...selectedIds, exerciseId]);
-      });
+      button.addEventListener('click', () => applyOrder([...selectedIds, exerciseId]));
       addGrid.appendChild(button);
     });
-    card.appendChild(addGrid);
+    reserve.append(summary, addGrid);
+    card.appendChild(reserve);
   }
 
   page.appendChild(card);
@@ -713,7 +688,6 @@ export function renderTodayPage(root) {
         }
       : todaySelection;
 
-  const settingsOpen = root.querySelector('.today-settings')?.open ?? false;
   const feedbackOpen = root.querySelector('.today-feedback')?.open ?? false;
   const manualOpen = root.querySelector('.today-manual')?.open ?? false;
   root.innerHTML = '';
@@ -722,12 +696,24 @@ export function renderTodayPage(root) {
   page.className = 'page';
   const history = readCompletedWorkoutHistory();
   const manual = createTodaySection('手动选择训练日', 'today-manual', manualOpen);
-  const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
   const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
   const detail = selection.isRestDay
     ? null
     : buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
+
+  if (detail && window.location.hash === '#today:adjust') {
+    const back = document.createElement('a');
+    back.className = 'history-back';
+    back.href = '#today';
+    back.textContent = '← 返回今日';
+    const title = document.createElement('h1');
+    title.textContent = '调整本次训练';
+    page.append(back, title);
+    renderExercisePlanner(page, detail, root);
+    root.appendChild(page);
+    return;
+  }
 
   if (!detail) {
     const feedback = buildTrainingFeedback({ history, selection, detail: null });
@@ -801,7 +787,6 @@ export function renderTodayPage(root) {
 
     page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
-    renderExercisePlanner(settings, detail, root);
     renderKeyExerciseFeedback(supporting, detail);
 
     const detailLink = document.createElement('a');
@@ -813,7 +798,13 @@ export function renderTodayPage(root) {
 
   renderManualSelector(manual, root);
   renderNutritionSummaryCard(supporting);
-  if (detail) page.appendChild(settings);
+  if (detail) {
+    const adjust = document.createElement('a');
+    adjust.className = 'today-secondary today-adjust-link';
+    adjust.href = '#today:adjust';
+    adjust.textContent = '调整本次训练';
+    page.appendChild(adjust);
+  }
   page.append(manual, supporting);
   if (detail) page.appendChild(renderTodayExerciseList(detail));
   root.appendChild(page);

@@ -674,6 +674,27 @@ function createTodaySection(label, className, open) {
   return section;
 }
 
+function renderTodayExerciseList(detail) {
+  const section = document.createElement('section');
+  section.className = 'today-exercise-list';
+
+  const title = document.createElement('h2');
+  title.textContent = '今天练什么';
+  const list = document.createElement('ul');
+  const currentWorkout = getUnfinishedWorkout(detail.planDayId);
+  const exerciseIds = currentWorkout?.exerciseLogs.map((log) => log.exerciseId)
+    ?? detail.exercises.map((exercise) => exercise.exerciseId);
+
+  for (const exerciseId of exerciseIds) {
+    const item = document.createElement('li');
+    item.textContent = getExerciseNameById(detail, exerciseId);
+    list.appendChild(item);
+  }
+
+  section.append(title, list);
+  return section;
+}
+
 export function renderTodayPage(root) {
   const todaySelection = getTodayTrainingSelection();
   const manualPlanDay = appState.selectedPlanDayId ? getManualPlanDay(appState.selectedPlanDayId) : null;
@@ -704,7 +725,11 @@ export function renderTodayPage(root) {
   const settings = createTodaySection('调整本次训练', 'today-settings', settingsOpen);
   const supporting = createTodaySection('训练反馈与补剂', 'today-feedback', feedbackOpen);
 
-  if (selection.isRestDay) {
+  const detail = selection.isRestDay
+    ? null
+    : buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
+
+  if (!detail) {
     const feedback = buildTrainingFeedback({ history, selection, detail: null });
 
     const hero = document.createElement('section');
@@ -731,7 +756,6 @@ export function renderTodayPage(root) {
     page.appendChild(hero);
     renderFeedbackPanel(supporting, feedback);
   } else {
-    const detail = buildTrainingDayDetail({ planDayId: selection.planDay.planDayId });
     const feedback = buildTrainingFeedback({ history, selection, detail });
 
     const hero = document.createElement('section');
@@ -789,7 +813,8 @@ export function renderTodayPage(root) {
 
   renderManualSelector(manual, root);
   renderNutritionSummaryCard(supporting);
-  if (!selection.isRestDay) page.appendChild(settings);
+  if (detail) page.appendChild(settings);
   page.append(manual, supporting);
+  if (detail) page.appendChild(renderTodayExerciseList(detail));
   root.appendChild(page);
 }

@@ -294,7 +294,9 @@ function renderFeedbackPanel(page, feedback) {
 
   const bar = document.createElement('div');
   bar.className = 'feedback-progress';
-  bar.innerHTML = `<span style="width: ${feedback.weekPercent}%"></span>`;
+  if (feedback.weekPercent > 0) {
+    bar.innerHTML = `<span style="width: ${feedback.weekPercent}%"></span>`;
+  }
   progressCard.appendChild(bar);
   page.appendChild(progressCard);
 }

@@ -709,9 +709,7 @@ export function renderTodayPage(root) {
     back.className = 'history-back';
     back.href = '#today';
     back.textContent = '← 返回今日';
-    const title = document.createElement('h1');
-    title.textContent = '调整本次训练';
-    page.append(back, title);
+    page.appendChild(back);
     renderExercisePlanner(page, detail, root);
     root.appendChild(page);
     return;
